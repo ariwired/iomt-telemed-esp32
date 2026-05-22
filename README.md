@@ -1,28 +1,70 @@
-# iomt-telemed-esp32
+# Sistema Híbrido de Monitoramento Remoto com Predição de Risco e Fog Computing
 
-Este repositório contém o código-fonte embarcado (Edge Computing) do nó sensor de um **Sistema Híbrido de Monitoramento Remoto** voltado para pacientes pós-operatórios. 
+Este repositório contém o ecossistema completo de um sistema de telemedicina e IoMT (Internet of Medical Things) voltado para o acompanhamento de pacientes pós-operatórios em suas residências. O objetivo principal é mitigar os custos de deslocamento e garantir a continuidade do monitoramento mesmo sob instabilidades de conexão com a internet.
 
-Desenvolvido para microcontroladores ESP32, este módulo é responsável pela aquisição de sinais vitais, aplicação de filtros digitais locais e transmissão de dados formatados para um nó *Fog* via protocolo MQTT.
+A arquitetura do projeto substitui a dependência 100% em Nuvem por uma abordagem de **Fog Computing**, onde a análise preliminar dos dados é realizada localmente. Além disso, o sistema utiliza modelos de **Machine Learning** para prever riscos clínicos de forma dinâmica, superando as limitações dos alertas baseados em limites fixos e estáticos.
 
-## Objetivo da Camada Edge
-Em sistemas de telemedicina tradicionais dependentes exclusivamente de *Cloud*, falhas de rede interrompem o monitoramento. Este módulo resolve esse problema atuando na borda: ele coleta, limpa e realiza uma pré-avaliação do risco do paciente localmente, disparando alarmes físicos em caso de emergência, mesmo offline.
+---
 
-## Principais Funcionalidades
-* **Aquisição Hard-Real Time:** Leitura contínua de Saturação de Oxigênio (SpO2), Frequência Cardíaca (FC) e Temperatura corporal.
-* **Filtro Digital Local:** Implementação de Filtro de Média Móvel para suavizar ruídos de movimentação do paciente antes da transmissão, otimizando banda e processamento no back-end.
-* **Avaliação de Risco Local:** Algoritmo determinístico baseado em pesos (SpO2: 50%, FC: 30%, Temp: 20%) para classificar o estado do paciente (NORMAL, ATENÇÃO, ALERTA, CRÍTICO).
-* **Atuadores Físicos:** Acionamento de LEDs RGB e Buzzer para alertas visuais e sonoros imediatos no ambiente físico.
-* **Gateway MQTT:** Formatação e publicação dos dados limpos em tópicos MQTT para consumo por serviços de mensageria na camada *Fog/Cloud*.
+## Estrutura do Repositório
 
-## Hardware Utilizado
-* Microcontrolador **ESP32** (NodeMCU/WROOM-32)
-* Sensor de Oximetria/Frequência: **MAX30102**
-* Sensor de Temperatura: **DS18B20**
-* Componentes de saída: LED RGB, Buzzer e resistores.
+*   `firmware/`: Código fonte em C++/Arduino desenvolvido no **PlatformIO** para o ESP32. Responsável pela aquisição, filtragem (Edge) e publicação via MQTT.
+*   `backend/`: API estruturada para ingestão do histórico de dados, execução dos modelos de IA/Deep Learning e orquestração via contêineres Docker.
+*   `frontend/`: Aplicação web gamificada que incentiva o paciente a registrar sintomas diariamente através de dinâmicas de engajamento e aprendizagem.
+*   `wokwi-simulation/`: Arquivos da simulação interativa de hardware para validação rápida no navegador.
+*   `docs/`: Diagramas e recursos visuais da arquitetura do sistema.
 
-## Integração com Inteligência Artificial
-Os payloads contínuos gerados por este microcontrolador são ingeridos por uma API de Back-End, onde modelos preditivos de **Machine Learning** processam a série temporal dos sinais vitais. O objetivo da integração com a IA é:
+```bash
+IOMT-TELEMED-ESP32/
+│
+├── .gitignore                  
+├── README.md                   
+├── docker-compose.yml
+│
+├── api/                        # API Spring Boot + Modelos de ML + Docker
+│   ├── src/                    
+│   └── Dockerfile
+├── docs/                       # Documentação e diagramas de arquitetura
+├── firmware/                   # Código C++ do ESP32 (PlatformIO)
+├── frontend/                   # Interface Dashboard
+└── wokwi-simulation/           # Sandbox para simulação rápida no navegador
+```
 
-* **Análise Preditiva de Tendências:** Identificar padrões de degradação clínica (como uma queda sutil, mas constante, na SpO2 associada à taquicardia) e alertar a equipe médica *antes* que o paciente atinja um estado de emergência.
-* **Fim dos Limites Estáticos:** Substituir alarmes tradicionais por algoritmos treinados que compreendem o padrão basal fisiológico de cada paciente.
-* **Mitigação de Falsos Alarmes:** Cruzar os dados vitais filtrados pela borda para garantir que notificações enviadas à equipe de saúde tenham alta precisão e relevância clínica.
+
+---
+
+## Fluxo de Funcionamento e Arquitetura
+
+1.  **Aquisição (Hard-Real Time):** O microcontrolador ESP32 realiza a leitura contínua dos sensores conectados ao paciente.
+2.  **Tratamento de Sinal (Edge):** Filtros digitais são aplicados diretamente no C++ do ESP32 para limpar ruídos de movimento do paciente, otimizando o consumo de banda de rede.
+3.  **Transmissão Local (Fog):** O ESP32 envia as informações estruturadas em JSON via Wi-Fi (protocolo MQTT) para um gateway de processamento local (Fog) na residência do paciente, garantindo que o fluxo de dados funcione mesmo sem internet.
+4.  **Inteligência Preditiva (Back-End):** O servidor consome a série temporal e utiliza modelos treinados de Machine Learning para analisar as curvas dos sinais vitais em tempo real, prevendo riscos iminentes e gerando alertas otimizados para a família e a rede médica.
+5.  **Ação de Alerta Local:** Em cenários de risco detectados, o próprio firmware aciona atuadores sonoros e visuais no ambiente físico de forma imediata.
+
+---
+
+## Protótipo Interativo (Hardware Sandbox)
+
+Para testar a lógica da camada de borda (Edge) sem a necessidade do hardware físico, uma simulação exata do circuito está disponível no Wokwi. Como a plataforma web não simula nativamente sensores biomédicos, o sinal de oximetria é emulado via potenciômetro para validação dos filtros e alarmes.
+
+🔗 **[Acessar Simulação ao Vivo no Wokwi](INSIRA_O_SEU_LINK_AQUI)**
+
+### Como testar na simulação:
+1. Inicie a execução do simulador no navegador.
+2. Altere o slider do sensor de temperatura ou reduza o valor do potenciômetro de SpO2 para menos de 90%.
+3. Observe os **LEDs indicadores** mudando de estado e o **Buzzer** disparando o alarme sonoro instantaneamente.
+4. Abra o *Serial Monitor* para acompanhar as mensagens JSON sendo geradas e publicadas nos tópicos MQTT do nó Fog.
+
+---
+
+## Sinais Monitorados e Hardware
+
+O sistema utiliza fusão de sensores para extrair um panorama clínico preciso do paciente:
+
+*   **Saturação de Oxigênio (SpO2) e Frequência Cardíaca:** Sensor de fotopletismografia (PPG) **MAX30102**.
+*   **Temperatura Corporal:** Sensor **DS18B20** (Versão impermeável).
+*   **Cinemática e Movimentação:** Acelerômetro e Giroscópio **MPU6050** (Útil para mapear repouso ou identificar quedas).
+*   **Interface Física Local:** Display LCD 16x2 com interface I2C para exibição direta dos sinais à beira do leito.
+*   **Indicadores de Alerta:** LEDs (Verde, Amarelo, Vermelho).
+
+---
