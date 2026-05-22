@@ -10,7 +10,6 @@
 #define PIN_LED_GREEN 25
 #define PIN_LED_YELLOW 26
 #define PIN_LED_RED 27
-#define PIN_BUZZER 14
 #define PIN_TEMP 4
 #define PIN_MOCK_SPO2 34
 
@@ -96,12 +95,10 @@ void updateAlerts(float temp, int spo2_simulado) {
   digitalWrite(PIN_LED_GREEN, LOW);
   digitalWrite(PIN_LED_YELLOW, LOW);
   digitalWrite(PIN_LED_RED, LOW);
-  noTone(PIN_BUZZER);
 
-  //lógica de alerta antes do modelo de ML na camada Fog
+  // lógica de alerta puramente visual
   if (spo2_simulado < 90 || temp > 38.5) {
     digitalWrite(PIN_LED_RED, HIGH);
-    tone(PIN_BUZZER, 1000); 
   } else if (spo2_simulado < 95 || temp > 37.5) {
     digitalWrite(PIN_LED_YELLOW, HIGH);
   } else {
