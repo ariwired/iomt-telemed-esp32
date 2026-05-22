@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "author": "Prototipagem Fog Healthcare",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 9.6, "left": -196.76, "attrs": {} },
+    {
+      "type": "wokwi-led",
+      "id": "led_green",
+      "top": 82.8,
+      "left": -457,
+      "attrs": { "color": "green" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_yellow",
+      "top": 130.8,
+      "left": -562.6,
+      "attrs": { "color": "yellow" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_red",
+      "top": -22.8,
+      "left": -524.2,
+      "attrs": { "color": "red" }
+    },
+    { "type": "wokwi-buzzer", "id": "buzzer", "top": 376.8, "left": -190.2, "attrs": {} },
+    {
+      "type": "wokwi-lcd1602",
+      "id": "lcd",
+      "top": -233.6,
+      "left": -781.6,
+      "attrs": { "pins": "i2c" }
+    },
+    { "type": "wokwi-mpu6050", "id": "mpu", "top": 90.22, "left": 127.12, "attrs": {} },
+    { "type": "wokwi-ds18b20", "id": "temp", "top": 334.87, "left": -53.52, "attrs": {} },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "mock_spo2",
+      "top": -145.3,
+      "left": -288.2,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "esp:GND.1", "led_green:C", "black", [] ],
+    [ "esp:GND.1", "led_yellow:C", "black", [] ],
+    [ "esp:GND.1", "led_red:C", "black", [] ],
+    [ "esp:GND.1", "buzzer:1", "black", [] ],
+    [ "esp:25", "led_green:A", "green", [ "v0" ] ],
+    [ "esp:26", "led_yellow:A", "yellow", [ "v0" ] ],
+    [ "esp:27", "led_red:A", "red", [ "v0" ] ],
+    [ "esp:14", "buzzer:2", "purple", [ "v0" ] ],
+    [ "esp:3V3", "mpu:VCC", "red", [] ],
+    [ "esp:GND.2", "mpu:GND", "black", [] ],
+    [ "esp:21", "mpu:SDA", "blue", [] ],
+    [ "esp:22", "mpu:SCL", "orange", [] ],
+    [ "esp:5V", "lcd:VCC", "red", [] ],
+    [ "esp:GND.2", "lcd:GND", "black", [] ],
+    [ "esp:21", "lcd:SDA", "blue", [] ],
+    [ "esp:22", "lcd:SCL", "orange", [] ],
+    [ "esp:3V3", "temp:VCC", "red", [] ],
+    [ "esp:GND.2", "temp:GND", "black", [] ],
+    [ "esp:4", "temp:DQ", "green", [] ],
+    [ "esp:3V3", "mock_spo2:VCC", "red", [] ],
+    [ "esp:GND.2", "mock_spo2:GND", "black", [] ],
+    [ "esp:34", "mock_spo2:SIG", "cyan", [] ]
+  ],
+  "dependencies": {}
+}
