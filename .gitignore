@@ -1,0 +1,9 @@
+# PlatformIO
+.pio
+.vscode/
+*.bin
+*.elf
+
+# OS Files
+.DS_Store
+Thumbs.db
