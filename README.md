@@ -10,7 +10,7 @@ A arquitetura do projeto substitui a dependência 100% em Nuvem por uma abordage
 
 *   `firmware/`: Código fonte em C++/Arduino desenvolvido no **PlatformIO** para o ESP32. Responsável pela aquisição, filtragem (Edge) e publicação via MQTT.
 *   `backend/`: API estruturada para ingestão do histórico de dados, execução dos modelos de IA/Deep Learning e orquestração via contêineres Docker.
-*   `frontend/`: Aplicação web gamificada que incentiva o paciente a registrar sintomas diariamente através de dinâmicas de engajamento e aprendizagem.
+*   `frontend/`: Dashboard mostrando os valores do paciente e com uma sessão para o modelo de IA.
 *   `wokwi-simulation/`: Arquivos da simulação interativa de hardware para validação rápida no navegador.
 *   `docs/`: Diagramas e recursos visuais da arquitetura do sistema.
 
