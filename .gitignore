@@ -1,29 +1,44 @@
-# PlatformIO
-.pio
-.vscode/
-*.bin
-*.elf
-
-# OS Files
+# arquivo de sistema e IDE
 .DS_Store
 Thumbs.db
-
-# Logs
-*.log  
-
-# IDE Files
 .idea/
-*.code-workspace
-*.vscode/
+.vscode/
+*.swp
+*.swo
+*.log
 
-# Build Files
-build/
-dist/
-target/
+# firmware do ESP32 (PlatformIO). arquivos de build, dependências e configurações locais
+firmware/.pio/
+firmware/.vscode/
+firmware/libdeps/
+firmware/build/
+firmware/secrets.h
+firmware/config_private.h
 
-# Docker
-*.dockerfile
-docker-compose.yml
+# back-end
+api/target/
+api/bin/
+api/*.jar
+api/*.war
+api/.mvn/wrapper/maven-wrapper.jar
+api/src/main/resources/application-local.properties
+api/src/main/resources/application-secret.properties
 
-# Environment Files
+# front-end
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.npm/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
 .env
+docker-compose.yml
