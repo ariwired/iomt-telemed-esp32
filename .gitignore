@@ -7,3 +7,23 @@
 # OS Files
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log  
+
+# IDE Files
+.idea/
+*.code-workspace
+*.vscode/
+
+# Build Files
+build/
+dist/
+target/
+
+# Docker
+*.dockerfile
+docker-compose.yml
+
+# Environment Files
+.env
