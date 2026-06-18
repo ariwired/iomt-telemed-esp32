@@ -9,7 +9,8 @@ A arquitetura do projeto substitui a dependência 100% em Nuvem por uma abordage
 ## Estrutura do Repositório
 
 *   `firmware/`: Código fonte em C++/Arduino desenvolvido no **PlatformIO** para o ESP32. Responsável pela aquisição, filtragem (Edge) e publicação via MQTT.
-*   `backend/`: API estruturada para ingestão do histórico de dados, execução dos modelos de IA/Deep Learning e orquestração via contêineres Docker.
+*   `api/`: API estruturada para ingestão do histórico de dados, execução dos modelos de IA e orquestração via contêineres Docker.
+*   `ml-api/`: Modelo Random Forest lendo os dados do paciente e validando para caso tenha um aumento drástico.
 *   `frontend/`: Dashboard mostrando os valores do paciente e com uma sessão para o modelo de IA.
 *   `wokwi-simulation/`: Arquivos da simulação interativa de hardware para validação rápida no navegador.
 *   `docs/`: Diagramas e recursos visuais da arquitetura do sistema.
@@ -47,7 +48,7 @@ IOMT-TELEMED-ESP32/
 
 Para testar a lógica da camada de borda (Edge) sem a necessidade do hardware físico, uma simulação exata do circuito está disponível no Wokwi. Como a plataforma web não simula nativamente sensores biomédicos, o sinal de oximetria é emulado via potenciômetro para validação dos filtros e alarmes.
 
-🔗 **[Acessar Simulação ao Vivo no Wokwi](INSIRA_O_SEU_LINK_AQUI)**
+🔗 **[Acessar Simulação ao Vivo no Wokwi](https://wokwi.com/projects/459458836238337025)**
 
 ### Como testar na simulação:
 1. Inicie a execução do simulador no navegador.
@@ -63,8 +64,6 @@ O sistema utiliza fusão de sensores para extrair um panorama clínico preciso d
 
 *   **Saturação de Oxigênio (SpO2) e Frequência Cardíaca:** Sensor de fotopletismografia (PPG) **MAX30102**.
 *   **Temperatura Corporal:** Sensor **DS18B20** (Versão impermeável).
-*   **Cinemática e Movimentação:** Acelerômetro e Giroscópio **MPU6050** (Útil para mapear repouso ou identificar quedas).
-*   **Interface Física Local:** Display LCD 16x2 com interface I2C para exibição direta dos sinais à beira do leito.
 *   **Indicadores de Alerta:** LEDs (Verde, Amarelo, Vermelho).
 
 ---
