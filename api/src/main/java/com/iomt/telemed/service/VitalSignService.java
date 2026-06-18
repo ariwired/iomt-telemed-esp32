@@ -1,5 +1,6 @@
 package com.iomt.telemed.service;
 
+import com.iomt.telemed.dto.MlPredictionResponseDTO;
 import com.iomt.telemed.dto.VitalSignPayloadDTO;
 import com.iomt.telemed.entity.VitalSign;
 import com.iomt.telemed.repository.VitalSignRepository;
@@ -13,6 +14,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -21,14 +23,23 @@ public class VitalSignService {
     private static final Logger logger = LoggerFactory.getLogger(VitalSignService.class);
     private final VitalSignRepository vitalSignRepository;
     private final PredictiveRiskService predictiveRiskService;
+    private final MlPredictionClient mlPredictionClient;
+    private final PatientService patientService;
 
-    public VitalSignService(VitalSignRepository vitalSignRepository, PredictiveRiskService predictiveRiskService) {
+    public VitalSignService(VitalSignRepository vitalSignRepository,
+                            PredictiveRiskService predictiveRiskService,
+                            MlPredictionClient mlPredictionClient,
+                            PatientService patientService) {
         this.vitalSignRepository = vitalSignRepository;
         this.predictiveRiskService = predictiveRiskService;
+        this.mlPredictionClient = mlPredictionClient;
+        this.patientService = patientService;
     }
 
     @Transactional
     public VitalSign processAndSaveTelemetry(VitalSignPayloadDTO dto) {
+        patientService.ensurePatientExists(dto.getPacienteId());
+
         VitalSign entity = VitalSign.builder()
                 .pacienteId(dto.getPacienteId())
                 .spo2(dto.getSpo2())
@@ -71,7 +82,7 @@ public class VitalSignService {
                     .temperatura(mediaTemp)
                     .build();
 
-            PredictiveRiskService.RiskAnalysis analise = predictiveRiskService.evaluateRisk(tendencia);
+            PredictiveRiskService.RiskAnalysis analise = resolveRiskAnalysis(tendencia);
 
             VitalSign ultimaLeituraReal = leiturasDoPaciente.get(leiturasDoPaciente.size() - 1);
             ultimaLeituraReal.setRiskScore(analise.score());
@@ -82,5 +93,27 @@ public class VitalSignService {
             logger.info("Veredito salvo para Paciente [{}]: Risco {}", pacienteId, analise.level());
         }
         logger.info("---------------------------------------------------");
+    }
+
+    /**
+     * Tenta obter o veredito do ml-api (Random Forest treinado em Python).
+     * Se a chamada falhar (timeout, ml-api fora do ar, resposta inválida),
+     * cai no PredictiveRiskService local como fallback, para o pipeline
+     * de telemetria nunca travar por causa de uma dependência externa.
+     */
+    private PredictiveRiskService.RiskAnalysis resolveRiskAnalysis(VitalSign tendencia) {
+        Optional<MlPredictionResponseDTO> mlResponse = mlPredictionClient.predict(tendencia);
+
+        if (mlResponse.isPresent()) {
+            try {
+                MlPredictionResponseDTO prediction = mlResponse.get();
+                VitalSign.RiskLevel level = PredictiveRiskService.parseLevel(prediction.getLevel());
+                return new PredictiveRiskService.RiskAnalysis(prediction.getScore(), level);
+            } catch (Exception e) {
+                logger.warn("Resposta do ml-api em formato inesperado, usando fallback local. Causa: {}", e.getMessage());
+            }
+        }
+
+        return predictiveRiskService.evaluateRisk(tendencia);
     }
 }
