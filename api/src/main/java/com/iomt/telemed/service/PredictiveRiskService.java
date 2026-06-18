@@ -41,4 +41,8 @@ public class PredictiveRiskService {
     }
 
     public record RiskAnalysis(Double score, VitalSign.RiskLevel level) {}
+
+    public static VitalSign.RiskLevel parseLevel(String level) {
+        return VitalSign.RiskLevel.valueOf(level.trim().toUpperCase());
+    }
 }

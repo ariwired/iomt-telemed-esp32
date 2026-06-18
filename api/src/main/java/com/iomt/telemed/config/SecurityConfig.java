@@ -20,16 +20,16 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-            .csrf(AbstractHttpConfigurer::disable)
+                .csrf(AbstractHttpConfigurer::disable)
 
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
 
-                .requestMatchers("/api/dashboard/**").permitAll()
-                .anyRequest().authenticated()
-            );
+                        .requestMatchers("/api/dashboard/**").permitAll()
+                        .anyRequest().authenticated()
+                );
 
         return http.build();
     }
@@ -37,12 +37,18 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Libera as portas padrão do React/Vite/Angular no Front-end
-        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:5173", "http://localhost:8080"));
+
+        configuration.setAllowedOrigins(List.of(
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "http://localhost:8080",
+                "http://localhost",
+                "http://localhost:80"
+        ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
         configuration.setAllowCredentials(true);
-        
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", configuration);
         return source;
