@@ -1,9 +1,5 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include <Wire.h>
-#include <LiquidCrystal_I2C.h>
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
@@ -13,14 +9,13 @@
 #define PIN_TEMP 4
 #define PIN_MOCK_SPO2 34
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);
-Adafruit_MPU6050 mpu;
 OneWire oneWire(PIN_TEMP);
 DallasTemperature tempSensor(&oneWire);
 
 const char* ssid = "Wokwi-GUEST";
 const char* password = "";
 const char* mqtt_server = "broker.hivemq.com"; 
+
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -39,16 +34,7 @@ void setup() {
 
   for (int i = 0; i < numReadings; i++) readings[i] = 0;
 
-  Wire.begin(21, 22);
-  lcd.init();
-  lcd.backlight();
-  lcd.setCursor(0,0);
-  lcd.print("Iniciando Sist.");
-  
-  if (!mpu.begin()) {
-    Serial.println("Falha ao encontrar MPU6050");
-  }
-  
+  Serial.println("Iniciando Sistema IoMT...");
   tempSensor.begin();
 
   setup_wifi();
@@ -71,7 +57,8 @@ void setup_wifi() {
 void reconnect() {
   while (!client.connected()) {
     Serial.print("Tentando conexao MQTT...");
-    if (client.connect("ESP32_MedicalNode_01")) {
+    String clientId = "ESP32_MedicalNode_" + String(random(0xffff), HEX);
+    if (client.connect(clientId.c_str())) {
       Serial.println("conectado");
     } else {
       Serial.print("falhou, rc=");
@@ -90,15 +77,19 @@ int applyEdgeFilter(int newValue) {
   return total / numReadings;
 }
 
-void updateAlerts(float temp, int spo2_simulado) {
+void updateAlerts(float temp, int spo2_simulado, int fc_simulado) {
   digitalWrite(PIN_LED_GREEN, LOW);
   digitalWrite(PIN_LED_YELLOW, LOW);
   digitalWrite(PIN_LED_RED, LOW);
 
-  // lógica de alerta puramente visual
-  if (spo2_simulado < 90 || temp > 38.5) {
+  // Critérios de Risco:
+  // Vermelho: SpO2 < 90 OU Temp > 38.5 OU FC > 115 (Crítico)
+  // Amarelo: SpO2 < 94 OU Temp > 37.5 OU FC > 100 (Atenção)
+  // Verde: Tudo normal
+
+  if (spo2_simulado < 90 || temp > 38.5 || fc_simulado > 115) {
     digitalWrite(PIN_LED_RED, HIGH);
-  } else if (spo2_simulado < 95 || temp > 37.5) {
+  } else if (spo2_simulado < 94 || temp > 37.5 || fc_simulado > 100) {
     digitalWrite(PIN_LED_YELLOW, HIGH);
   } else {
     digitalWrite(PIN_LED_GREEN, HIGH);
@@ -110,33 +101,38 @@ void loop() {
   client.loop();
 
   tempSensor.requestTemperatures();
-  float tempC = tempSensor.getTempCByIndex(0);
+  float temp = tempSensor.getTempCByIndex(0);
   
-  int rawSpO2 = analogRead(PIN_MOCK_SPO2); //aqui entraria a leitura I2C do MAX30102
-  
+  //lê o potenciômetro para simular a saturação
+  int rawSpO2 = analogRead(PIN_MOCK_SPO2); 
   averageSpO2Raw = applyEdgeFilter(rawSpO2);
-  int spo2_percentage = map(averageSpO2Raw, 0, 4095, 80, 100); 
 
-  sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
+  //converte a leitura (0-4095) para porcentagem (80% a 100%)
+  int spo2_simulado = map(averageSpO2Raw, 0, 4095, 80, 100); 
 
-  updateAlerts(tempC, spo2_percentage); //alerta Local
+  // Taquicardia
+  int fc_simulado = random(110, 125);
 
-  lcd.clear();
-  lcd.setCursor(0,0);
-  lcd.print("SpO2: "); lcd.print(spo2_percentage); lcd.print("%");
-  lcd.setCursor(0,1);
-  lcd.print("Temp: "); lcd.print(tempC); lcd.print("C");
+  updateAlerts(temp, spo2_simulado, fc_simulado);
+
+  Serial.print("Leitura Local -> SpO2: ");
+  Serial.print(spo2_simulado);
+  Serial.print("% | FC: ");
+  Serial.print(fc_simulado);
+  Serial.print(" bpm | Temp: ");
+  Serial.print(temp);
+  Serial.println("C");
 
   String payload = "{";
-  payload += "\"paciente_id\": \"12345\",";
-  payload += "\"spo2\": " + String(spo2_percentage) + ",";
-  payload += "\"temp\": " + String(tempC) + ",";
-  payload += "\"accel_z\": " + String(a.acceleration.z);
+  payload += "\"paciente_id\": \"CRITICO_02\",";
+  payload += "\"spo2\": " + String(spo2_simulado) + ",";
+  payload += "\"fc\": " + String(fc_simulado) + ","; 
+  payload += "\"temp\": " + String(temp);
   payload += "}";
 
   client.publish("hospital/fog/monitoramento", payload.c_str());
-  Serial.println("Publicado: " + payload);
+  Serial.println("Enviado para a Nuvem: " + payload);
+  Serial.println("-----------------------------------");
 
-  delay(2000);
+  delay(2000); 
 }

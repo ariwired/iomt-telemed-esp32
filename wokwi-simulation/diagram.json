@@ -25,20 +25,12 @@
       "left": -245.8,
       "attrs": { "color": "red" }
     },
-    {
-      "type": "wokwi-lcd1602",
-      "id": "lcd",
-      "top": 25.6,
-      "left": 447.2,
-      "attrs": { "pins": "i2c" }
-    },
-    { "type": "wokwi-mpu6050", "id": "mpu", "top": -303.38, "left": -93.68, "attrs": {} },
     { "type": "wokwi-ds18b20", "id": "temp", "top": -212.33, "left": 320.88, "attrs": {} },
     {
       "type": "wokwi-potentiometer",
       "id": "mock_spo2",
-      "top": 315.5,
-      "left": -163.4,
+      "top": -318.1,
+      "left": -201.8,
       "attrs": {}
     }
   ],
@@ -51,14 +43,6 @@
     [ "esp:25", "led_green:A", "green", [ "v0" ] ],
     [ "esp:26", "led_yellow:A", "yellow", [ "v0" ] ],
     [ "esp:27", "led_red:A", "red", [ "v0" ] ],
-    [ "esp:3V3", "mpu:VCC", "red", [] ],
-    [ "esp:GND.2", "mpu:GND", "black", [] ],
-    [ "esp:21", "mpu:SDA", "blue", [] ],
-    [ "esp:22", "mpu:SCL", "orange", [] ],
-    [ "esp:5V", "lcd:VCC", "red", [] ],
-    [ "esp:GND.2", "lcd:GND", "black", [] ],
-    [ "esp:21", "lcd:SDA", "blue", [] ],
-    [ "esp:22", "lcd:SCL", "orange", [] ],
     [ "esp:3V3", "temp:VCC", "red", [] ],
     [ "esp:GND.2", "temp:GND", "black", [] ],
     [ "esp:4", "temp:DQ", "green", [] ],
