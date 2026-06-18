@@ -42,3 +42,8 @@ frontend/.env.production.local
 
 .env
 docker-compose.yml
+
+# venv
+venv/
+
+.github/
