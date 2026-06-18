@@ -26,8 +26,15 @@ Para testar a lógica da camada de borda (Edge) sem a necessidade do hardware f�
 
 O sistema utiliza fusão de sensores para extrair um panorama clínico preciso do paciente:
 
-*   **Saturação de Oxigênio (SpO2) e Frequência Cardíaca:** Sensor de fotopletismografia (PPG) **MAX30102**.
-*   **Temperatura Corporal:** Sensor **DS18B20** (Versão impermeável).
-*   **Indicadores de Alerta:** LEDs (Verde, Amarelo, Vermelho).
+### Sensores e Micro controlador
+- Microcontrolador: ESP-32 ISM 2.4G 802.11/b/g/n
+- Sensor de Oximetria e Frequência Cardíaca: MAX30102 
+- Sensor de Temperatura Corporal: DS18B20 (Versão Impermeável)
+
+**LEDs**
+- 1x LED Vermelho 
+- 1x LED Amarelo 
+- 1x LED Verde
+
 
 ---
