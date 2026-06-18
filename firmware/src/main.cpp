@@ -6,19 +6,12 @@
 #include <DallasTemperature.h>
 #include "MAX30105.h"
 #include "spo2_algorithm.h"
-
-#define PIN_LED_GREEN 25
-#define PIN_LED_YELLOW 26
-#define PIN_LED_RED 27
-#define PIN_TEMP 4
+#include "config.h"
 
 OneWire oneWire(PIN_TEMP);
 DallasTemperature tempSensor(&oneWire);
 MAX30105 particleSensor;
 
-const char* ssid = "nome_wifi";
-const char* password = "senha_wifi";
-const char* mqtt_server = "broker.hivemq.com"; 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -33,8 +26,8 @@ int8_t validHeartRate;
 void setup_wifi() {
   delay(10);
   Serial.print("Conectando a ");
-  Serial.println(ssid);
-  WiFi.begin(ssid, password);
+  Serial.println(WIFI_SSID);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -45,8 +38,8 @@ void setup_wifi() {
 void reconnect() {
   while (!client.connected()) {
     Serial.print("Tentando conexao MQTT...");
-    if (client.connect("ESP32_MedicalNode_01")) {
-      Serial.println("conectado");
+    if (client.connect(MQTT_CLIENT_ID)) {
+      Serial.println("conectado ao Fog Node");
     } else {
       delay(2000);
     }
@@ -77,18 +70,17 @@ void setup() {
   pinMode(PIN_LED_RED, OUTPUT);
 
   Wire.begin(21, 22);
-
   tempSensor.begin();
 
   if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) {
-    Serial.println("MAX30102 não encontrado. Verifique os jumpers!");
+    Serial.println("Erro Crítico: MAX30102 não encontrado na via I2C!");
     while (1); 
   }
 
   particleSensor.setup(60, 4, 2, 400, 411, 4096); 
 
   setup_wifi();
-  client.setServer(mqtt_server, 1883);
+  client.setServer(MQTT_SERVER, MQTT_PORT);
 }
 
 void loop() {
@@ -112,12 +104,12 @@ void loop() {
   }
 
   String payload = "{";
-  payload += "\"paciente_id\": \"12345\",";
+  payload += "\"paciente_id\": \"" + String(PACIENTE_ID) + "\",";
   payload += "\"spo2\": " + String(validSPO2 ? spo2 : 0) + ",";
   payload += "\"fc\": " + String(validHeartRate ? heartRate : 0) + ",";
   payload += "\"temp\": " + String(tempC);
   payload += "}";
 
-  client.publish("hospital/fog/monitoramento", payload.c_str());
-  Serial.println("Dados enviados: " + payload);
+  client.publish(MQTT_TOPIC, payload.c_str());
+  Serial.println("Telemed Edge-to-Fog: " + payload);
 }
