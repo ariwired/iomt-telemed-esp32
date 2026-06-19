@@ -1,27 +1,21 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include <Wire.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
-#include "MAX30105.h"
-#include "spo2_algorithm.h"
+// #include <Wire.h>
+// #include <OneWire.h>
+// #include <DallasTemperature.h>
+// #include "MAX30105.h"
+// #include "spo2_algorithm.h"
 #include "config.h"
 
-OneWire oneWire(PIN_TEMP);
-DallasTemperature tempSensor(&oneWire);
-MAX30105 particleSensor;
+// OneWire oneWire(PIN_TEMP);
+// DallasTemperature tempSensor(&oneWire);
+// MAX30105 particleSensor;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-uint32_t irBuffer[100]; 
-uint32_t redBuffer[100]; 
-int32_t bufferLength = 100;
-int32_t spo2; 
-int8_t validSPO2;
-int32_t heartRate;
-int8_t validHeartRate;
+unsigned long lastMsg = 0;
 
 void setup_wifi() {
   delay(10);
@@ -69,15 +63,14 @@ void setup() {
   pinMode(PIN_LED_YELLOW, OUTPUT);
   pinMode(PIN_LED_RED, OUTPUT);
 
-  Wire.begin(21, 22);
-  tempSensor.begin();
+  // Wire.begin(21, 22);
+  // tempSensor.begin();
 
-  if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) {
-    Serial.println("Erro Crítico: MAX30102 não encontrado na via I2C!");
-    while (1); 
-  }
-
-  particleSensor.setup(60, 4, 2, 400, 411, 4096); 
+  // if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) {
+  //   Serial.println("Erro Crítico: MAX30102 não encontrado na via I2C!");
+  //   while (1); 
+  // }
+  // particleSensor.setup(60, 4, 2, 400, 411, 4096); 
 
   setup_wifi();
   client.setServer(MQTT_SERVER, MQTT_PORT);
@@ -87,29 +80,44 @@ void loop() {
   if (!client.connected()) reconnect();
   client.loop();
 
-  tempSensor.requestTemperatures();
-  float tempC = tempSensor.getTempCByIndex(0);
+  unsigned long now = millis();
 
-  for (byte i = 0; i < bufferLength; i++) {
-    while (particleSensor.available() == false) particleSensor.check();
-    redBuffer[i] = particleSensor.getRed();
-    irBuffer[i] = particleSensor.getIR();
-    particleSensor.nextSample(); 
+  if (now - lastMsg > 5000) {
+    lastMsg = now;
+
+    // COMENTANDO A LEITURA REAL DOS SENSORES
+    /*
+    tempSensor.requestTemperatures();
+    float tempC = tempSensor.getTempCByIndex(0);
+
+    for (byte i = 0; i < bufferLength; i++) {
+      while (particleSensor.available() == false) particleSensor.check();
+      redBuffer[i] = particleSensor.getRed();
+      irBuffer[i] = particleSensor.getIR();
+      particleSensor.nextSample(); 
+    }
+   
+    maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
+    */
+
+    float tempC = 36.6; 
+    int32_t spo2 = 98;
+    int32_t heartRate = 72;
+    int8_t validSPO2 = 1;
+    int8_t validHeartRate = 1;
+
+    if (validSPO2) {
+      updateAlerts(tempC, spo2);
+    }
+
+    String payload = "{";
+    payload += "\"paciente_id\": \"" + String(PACIENTE_ID) + "\",";
+    payload += "\"spo2\": " + String(validSPO2 ? spo2 : 0) + ",";
+    payload += "\"fc\": " + String(validHeartRate ? heartRate : 0) + ",";
+    payload += "\"temp\": " + String(tempC);
+    payload += "}";
+
+    client.publish(MQTT_TOPIC, payload.c_str());
+    Serial.println("Telemed Edge-to-Fog (MOCK): " + payload);
   }
- 
-  maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
-
-  if (validSPO2) {
-    updateAlerts(tempC, spo2);
-  }
-
-  String payload = "{";
-  payload += "\"paciente_id\": \"" + String(PACIENTE_ID) + "\",";
-  payload += "\"spo2\": " + String(validSPO2 ? spo2 : 0) + ",";
-  payload += "\"fc\": " + String(validHeartRate ? heartRate : 0) + ",";
-  payload += "\"temp\": " + String(tempC);
-  payload += "}";
-
-  client.publish(MQTT_TOPIC, payload.c_str());
-  Serial.println("Telemed Edge-to-Fog: " + payload);
 }
