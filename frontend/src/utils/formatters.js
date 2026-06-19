@@ -28,7 +28,7 @@ const RISK_META = {
 };
 
 export function riskMeta(level) {
-  return RISK_META[level] ?? { label: "Indisponível", tone: "unknown", order: -1 };
+  return RISK_META[level] ?? { label: "Calculando Risco...", tone: "unknown", order: -1 };
 }
 
 export function formatClock(date) {

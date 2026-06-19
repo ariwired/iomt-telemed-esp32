@@ -352,7 +352,7 @@ table {
 
 .risk-banner__gauge-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--risk-low), var(--risk-medium), var(--risk-high), var(--risk-critical));
+  background: var(--text-muted);
   border-radius: 99px;
   transition: width 0.4s ease;
 }
@@ -362,6 +362,21 @@ table {
   font-size: 13px;
   color: var(--text-muted);
   width: 38px;
+}
+
+.risk-banner__confidence {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.risk-banner__confidence-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.risk-banner__confidence-value {
+  font-size: 20px;
+  font-weight: 600;
 }
 
 /* vitals grid / cards */
