@@ -24,6 +24,16 @@ O projeto foi construído com foco na resiliência e baixa latência, dividindo 
 
 ---
 
+## Dataset
+Este projeto usa o dataset "MIMIC-III - Deep Reinforcement Learning" do Kaggle:
+https://www.kaggle.com/datasets/asjad99/mimiciii
+
+Para reproduzir:
+1. Baixe o dataset do link acima (requer conta Kaggle).
+2. Coloque o(s) arquivo(s) em `dataset`.
+
+---
+
 ## Protótipo Interativo 
 
 Para testar a lógica da camada de borda (Edge) sem a necessidade do hardware físico, uma simulação exata do circuito está disponível no Wokwi. Como a plataforma web não simula nativamente sensores biomédicos, o sinal de oximetria é emulado via potenciômetro para validação dos filtros e alarmes.

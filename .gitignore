@@ -49,3 +49,5 @@ venv/
 .github/
 
 **/config.h
+
+/dataset
