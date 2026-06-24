@@ -1,0 +1,112 @@
+EXPERIMENTO DE CALIBRAÇÃO DO SENSOR DS18B20
+
+
+1. METODOLOGIA
+----------------------------------------------------------------
+Calibração por offset fixo, seguindo a metodologia descrita no DOC_DS18B20.md (Seção 3.3):
+
+    offset = temp_referencia - temp_ds18b20_estabilizada
+
+Termômetro: DMT-2027 Termômetro Clínico Digital G-TECH Modelo TH1027
+
+Onde:
+- temp_referencia = leitura do termômetro
+- temp_ds18b20_estabilizada = leitura bruta do DS18B20 no
+  momento em que foi reportado "ESTAVEL"
+
+Protocolo de medição:
+- Termômetro e sensor DS18B20 posicionados SIMULTANEAMENTE na mesma axila, ambos pressionados contra a pele.
+- Repetido 10 vezes para reduzir o ruído de medição.
+- Em cada repetição, anotou-se o valor do termômetro e o valor bruto do DS18B20, apenas quando o código exibia "ESTAVEL - leitura valida para registro".
+
+
+2. DADOS BRUTOS COLETADOS (10 repetições)
+----------------------------------------------------------------
+ #  | Termômetro (ref) | DS18B20 Bruta | Offset (ref - bruta)
+----|-------------------|----------------|----------------------
+ 1  |      35.20        |     33.75      |       1.45
+ 2  |      35.50        |     33.88      |       1.62
+ 3  |      35.50        |     34.19      |       1.31
+ 4  |      36.20        |     34.50      |       1.70
+ 5  |      36.30        |     34.75      |       1.55
+ 6  |      36.50        |     34.81      |       1.69
+ 7  |      36.40        |     34.94      |       1.46
+ 8  |      36.60        |     35.00      |       1.60
+ 9  |      36.70        |     35.06      |       1.64
+10  |      36.50        |     34.81      |       1.69
+
+O offset de cada linha é calculado individualmente, depois
+todos os 10 valores são combinados estatisticamente.
+
+
+3. CÁLCULO DO OFFSET FINAL
+----------------------------------------------------------------
+(3.1) Média aritmética dos 10 offsets:
+
+    media = (soma de todos os offsets) / quantidade de medições
+    media = (1.45 + 1.62 + 1.31 + 1.70 + 1.55 + 1.69 + 1.46 + 1.60 + 1.64 + 1.69) / 10
+    media = 15.71 / 10
+    media = 1.571 °C
+
+    -> OFFSET_CALIBRACAO ADOTADO = 1.57
+
+3.2) Desvio padrão (mede o quanto os offsets individuais
+     variam em torno da média):
+
+    desvio_padrao = 0.122 °C
+
+    Conclusão: as 10 medições de offset ficaram, em média,
+    a apenas 0.12°C de distância da média geral. 
+
+(3.3) Range dos offsets observados:
+
+    minimo = 1.31   |   maximo = 1.70   |   range = 0.39 °C
+
+    Ou seja, a variação de quase 0.4°C entre a pior e a melhor medição
+    é esperada nesse tipo de calibração, dado o ruído do instrumento + variação natural da temperatura da pele entre tentativas. Não indicando problema de sensor.
+
+
+4. VALIDAÇÃO: OFFSET FIXO vs. MODELO LINEAR
+----------------------------------------------------------------
+Antes de adotar o offset fixo, foi testado se um modelo linear
+(ref = a * bruta + b, calibração afim — mencionado como possível
+evolução futura na Seção 3.3 do DOC_DS18B20.md) traria uma
+melhora significativa de precisão.
+
+Erro médio absoluto (MAE = Mean Absolute Error) de cada modelo,
+aplicado de volta aos 10 pontos coletados:
+
+    MAE com offset fixo (1.57) = 0.103 °C
+    MAE com modelo linear (1.107x - 2.116) = 0.092 °C
+
+Diferença entre os dois modelos: apenas ~0.01 °C.
+
+A decisão foi manter o offset fixo.
+
+Motivos:
+  a) A melhora do modelo linear é marginal (0.01°C) e não
+     justifica a complexidade extra de implementação.
+  b) Os dados coletados cobrem uma faixa estreita de
+     temperatura (33.75 a 35.06°C de leitura bruta, ~1.3°C de
+     amplitude). Uma regressão linear confiável exige pontos
+     espalhados numa faixa mais ampla; com pouca amplitude,
+     o coeficiente angular ("a") da reta fica pouco confiável
+     e pode não generalizar bem para temperaturas fora dessa
+     faixa estreita.
+  c) O offset fixo já resulta em MAE de 0.103°C, dentro da
+     faixa de erro (0.046–0.130°C) reportada pelo estudo
+     metrológico citado no DOC_DS18B20.md (Referência 1) para
+     sensores DS18B20 calibrados individualmente.
+
+
+5. RESULTADO FINAL
+----------------------------------------------------------------
+    OFFSET_CALIBRACAO = 1.57
+
+    Erro esperado da calibração (MAE): ~0.10 °C
+
+6. LIMITAÇÕES E TRABALHO FUTURO
+----------------------------------------------------------------
+- Calibração realizada com termômetro doméstico, o que introduz incerteza do próprio instrumento de referência.
+- Faixa de temperatura testada foi estreita (~1.3°C). Caso se deseje um modelo linear no futuro, repetir o protocolo em 2-3 faixas de temperatura mais distintas (ex.: repouso vs. pós-exercício leve), conforme sugerido na Seção 3.3 do DOC_DS18B20.md.
+- Offset é válido apenas para o ponto de contato testado (axila). Uso em outro local do corpo pode exigir nova calibração.
