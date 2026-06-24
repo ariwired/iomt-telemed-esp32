@@ -23,10 +23,10 @@
 // instante.
 //
 // offset = temp_referencia - temp_ds18b20_estabilizada
-// Exemplo: referência marcou 36.5°C, DS18B20 estabilizou em 31.8°C-> offset = 36.5 - 31.8 = 4.7
-// O valor do offset pode variar dependendo do local de contato, pessoa, etc.
+// Calibrado em 10 medições: Acesse a explicação da calibração em docs/experiments/experimento_calibracao_ds18b20.txt
+// offset medio = 1.57 (desvio padrao = 0.12, MAE = 0.10 C)
 
-#define OFFSET_CALIBRACAO 4.7
+#define OFFSET_CALIBRACAO 1.57
 
 // ------------------------------------------------------------
 // DETECÇÃO DE ESTABILIZAÇÃO
