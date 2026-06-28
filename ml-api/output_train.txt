@@ -1,0 +1,164 @@
+Carregando dataset: dataset_treino.csv
+Total de amostras: 904 | Pacientes (grupos) unicos: 12
+Distribuicao de classes:
+risco
+LOW       610
+MEDIUM    261
+HIGH       33
+Name: count, dtype: int64
+Split treino/teste agrupado por paciente: 734 linhas / 9 pacientes no treino, 170 linhas / 3 pacientes no teste. Nenhum paciente em comum (verificado).
+
+--- RandomForest | balanceamento=none ---
+Melhores hiperparametros (GridSearchCV, 3-fold agrupado por paciente): {'clf__max_depth': None, 'clf__n_estimators': 100}
+F1 macro medio na CV agrupada (treino): 0.750
+Desempenho no conjunto de teste (holdout, pacientes nunca vistos no treino):
+              precision    recall  f1-score   support
+
+        HIGH       0.71      0.88      0.79        17
+         LOW       0.98      1.00      0.99        81
+      MEDIUM       0.97      0.89      0.93        72
+
+    accuracy                           0.94       170
+   macro avg       0.89      0.92      0.90       170
+weighted avg       0.95      0.94      0.94       170
+
+
+--- XGBoost | balanceamento=none ---
+Melhores hiperparametros (GridSearchCV, 3-fold agrupado por paciente): {'clf__learning_rate': 0.3, 'clf__max_depth': 6, 'clf__n_estimators': 200}
+F1 macro medio na CV agrupada (treino): 0.774
+Desempenho no conjunto de teste (holdout, pacientes nunca vistos no treino):
+              precision    recall  f1-score   support
+
+        HIGH       0.85      1.00      0.92        17
+         LOW       0.99      0.99      0.99        81
+      MEDIUM       0.99      0.94      0.96        72
+
+    accuracy                           0.97       170
+   macro avg       0.94      0.98      0.96       170
+weighted avg       0.97      0.97      0.97       170
+
+
+--- LogisticRegression | balanceamento=none ---
+Melhores hiperparametros (GridSearchCV, 3-fold agrupado por paciente): {'clf__C': 10.0}
+F1 macro medio na CV agrupada (treino): 0.610
+Desempenho no conjunto de teste (holdout, pacientes nunca vistos no treino):
+              precision    recall  f1-score   support
+
+        HIGH       0.29      1.00      0.45        17
+         LOW       1.00      0.49      0.66        81
+      MEDIUM       0.42      0.42      0.42        72
+
+    accuracy                           0.51       170
+   macro avg       0.57      0.64      0.51       170
+weighted avg       0.68      0.51      0.54       170
+
+
+--- RandomForest | balanceamento=smote ---
+Melhores hiperparametros (GridSearchCV, 3-fold agrupado por paciente): {'clf__max_depth': 8, 'clf__n_estimators': 100}
+F1 macro medio na CV agrupada (treino): 0.672
+Desempenho no conjunto de teste (holdout, pacientes nunca vistos no treino):
+              precision    recall  f1-score   support
+
+        HIGH       0.38      1.00      0.55        17
+         LOW       0.99      0.99      0.99        81
+      MEDIUM       0.98      0.60      0.74        72
+
+    accuracy                           0.82       170
+   macro avg       0.78      0.86      0.76       170
+weighted avg       0.92      0.82      0.84       170
+
+
+--- XGBoost | balanceamento=smote ---
+Melhores hiperparametros (GridSearchCV, 3-fold agrupado por paciente): {'clf__learning_rate': 0.1, 'clf__max_depth': 3, 'clf__n_estimators': 100}
+F1 macro medio na CV agrupada (treino): 0.724
+Desempenho no conjunto de teste (holdout, pacientes nunca vistos no treino):
+              precision    recall  f1-score   support
+
+        HIGH       0.38      0.82      0.52        17
+         LOW       1.00      0.99      0.99        81
+      MEDIUM       0.92      0.68      0.78        72
+
+    accuracy                           0.84       170
+   macro avg       0.77      0.83      0.77       170
+weighted avg       0.91      0.84      0.86       170
+
+
+--- LogisticRegression | balanceamento=smote ---
+Melhores hiperparametros (GridSearchCV, 3-fold agrupado por paciente): {'clf__C': 10.0}
+F1 macro medio na CV agrupada (treino): 0.620
+Desempenho no conjunto de teste (holdout, pacientes nunca vistos no treino):
+              precision    recall  f1-score   support
+
+        HIGH       0.30      1.00      0.46        17
+         LOW       1.00      0.56      0.71        81
+      MEDIUM       0.47      0.44      0.46        72
+
+    accuracy                           0.55       170
+   macro avg       0.59      0.67      0.54       170
+weighted avg       0.71      0.55      0.58       170
+
+
+--- RandomForest | balanceamento=adasyn ---
+Melhores hiperparametros (GridSearchCV, 3-fold agrupado por paciente): {'clf__max_depth': 8, 'clf__n_estimators': 200}
+F1 macro medio na CV agrupada (treino): 0.713
+Desempenho no conjunto de teste (holdout, pacientes nunca vistos no treino):
+              precision    recall  f1-score   support
+
+        HIGH       0.39      0.94      0.55        17
+         LOW       0.99      0.93      0.96        81
+      MEDIUM       0.87      0.64      0.74        72
+
+    accuracy                           0.81       170
+   macro avg       0.75      0.84      0.75       170
+weighted avg       0.88      0.81      0.82       170
+
+
+--- XGBoost | balanceamento=adasyn ---
+Melhores hiperparametros (GridSearchCV, 3-fold agrupado por paciente): {'clf__learning_rate': 0.1, 'clf__max_depth': 3, 'clf__n_estimators': 200}
+F1 macro medio na CV agrupada (treino): 0.719
+Desempenho no conjunto de teste (holdout, pacientes nunca vistos no treino):
+              precision    recall  f1-score   support
+
+        HIGH       0.47      0.94      0.63        17
+         LOW       1.00      0.96      0.98        81
+      MEDIUM       0.93      0.75      0.83        72
+
+    accuracy                           0.87       170
+   macro avg       0.80      0.88      0.81       170
+weighted avg       0.92      0.87      0.88       170
+
+
+--- LogisticRegression | balanceamento=adasyn ---
+Melhores hiperparametros (GridSearchCV, 3-fold agrupado por paciente): {'clf__C': 1.0}
+F1 macro medio na CV agrupada (treino): 0.566
+Desempenho no conjunto de teste (holdout, pacientes nunca vistos no treino):
+              precision    recall  f1-score   support
+
+        HIGH       0.28      1.00      0.44        17
+         LOW       0.98      0.57      0.72        81
+      MEDIUM       0.44      0.38      0.40        72
+
+    accuracy                           0.53       170
+   macro avg       0.56      0.65      0.52       170
+weighted avg       0.68      0.53      0.56       170
+
+
+=== Tabela comparativa final (ordenada por F1 macro NO HOLDOUT DE TESTE) ===
+            modelo balanceamento  f1_macro_cv_treino  acuracia_teste  precisao_macro_teste  recall_macro_teste  f1_macro_teste
+           XGBoost          none            0.774463        0.970588              0.941054            0.977366        0.957037
+      RandomForest          none            0.750135        0.941176              0.886629            0.923747        0.901605
+           XGBoost        adasyn            0.719102        0.870588              0.800541            0.884713        0.813117
+           XGBoost         smote            0.723736        0.841176              0.767636            0.830580        0.765436
+      RandomForest         smote            0.671582        0.823529              0.780902            0.861626        0.759140
+      RandomForest        adasyn            0.713497        0.805882              0.748337            0.835330        0.747713
+LogisticRegression         smote            0.620485        0.552941              0.589611            0.666667        0.543629
+LogisticRegression        adasyn            0.566145        0.529412              0.564299            0.647634        0.519211
+LogisticRegression          none            0.609988        0.511765              0.570224            0.636831        0.509369
+
+Tabela de metricas salva em: metricas_comparativo.csv
+
+Melhor combinacao por F1 macro no HOLDOUT DE TESTE: XGBoost + balanceamento=none.
+
+
+Salvando modelo final (XGBoost + none) em: model.pkl
+Treinamento concluido.
