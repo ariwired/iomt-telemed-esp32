@@ -10,6 +10,7 @@ IMPORTANTE: SMOTE/ADASYN sao aplicados SOMENTE no conjunto de treino, nunca no t
 
 Uso:
     python train.py --dataset dataset_treino.csv
+    python train.py --dataset dataset_treino.csv --modelo RandomForest --balanceamento none
 """
 
 import argparse
@@ -17,181 +18,247 @@ import joblib
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV
+from sklearn.model_selection import GroupShuffleSplit, StratifiedGroupKFold, GridSearchCV
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from xgboost import XGBClassifier
 from imblearn.over_sampling import SMOTE, ADASYN
+from imblearn.pipeline import Pipeline as ImbPipeline
 
+FEATURES = ["spo2", "fc", "temp"]
 
 MODELOS_E_GRIDS = {
     "RandomForest": (
         RandomForestClassifier(random_state=42, class_weight="balanced"),
         {
-            "n_estimators": [100, 200],
-            "max_depth": [8, None],
+            "clf__n_estimators": [100, 200],
+            "clf__max_depth": [8, None],
         },
     ),
     "XGBoost": (
         XGBClassifier(random_state=42, eval_metric="mlogloss"),
         {
-            "n_estimators": [100, 200],
-            "max_depth": [3, 6],
-            "learning_rate": [0.1, 0.3],
+            "clf__n_estimators": [100, 200],
+            "clf__max_depth": [3, 6],
+            "clf__learning_rate": [0.1, 0.3],
         },
     ),
     "LogisticRegression": (
         LogisticRegression(max_iter=2000, class_weight="balanced"),
         {
-            "C": [0.1, 1.0, 10.0],
+            "clf__C": [0.1, 1.0, 10.0],
         },
     ),
 }
 
 
+
 def carregar_dados(caminho_csv: str):
     df = pd.read_csv(caminho_csv)
-    X = df[["spo2", "fc", "temp"]]
+
+    faltando = {"spo2", "fc", "temp", "risco"} - set(df.columns)
+    if faltando:
+        raise ValueError(f"Coluna(s) obrigatoria(s) faltando no dataset: {faltando}")
+
+    if "icustay_id" not in df.columns:
+        grupos = pd.Series(range(len(df)))
+    else:
+        grupos = df["icustay_id"]
+
+    X = df[FEATURES]
     y = df["risco"]
-    return X, y
+    return X, y, grupos
 
 
-def balancear_treino(X_train, y_train, estrategia: str):
+def k_neighbors_seguro(y_encoded, maximo=5) -> int:
     """
-        Aplica a estrategia de balanceamento escolhida SOMENTE no treino.
-
-        "none": retorna os dados originais, sem alteracao (o balanceamento nesse caso fica a cargo do class_weight="balanced" dentro do proprio modelo, ja configurado em MODELOS_E_GRIDS).
-        "smote": gera exemplos sinteticos das classes minoritarias por interpolacao entre k vizinhos mais proximos reais.
-        "adasyn": como o SMOTE, mas concentra a geracao de exemplos sinteticos perto da fronteira de decisao.
+        k_neighbors do SMOTE/ADASYN nao pode ser >= numero de exemplos da classe minoritaria.
     """
-    if estrategia == "none":
-        return X_train, y_train
+    contagem_minima = pd.Series(y_encoded).value_counts().min()
+    return max(1, min(maximo, contagem_minima - 1))
 
-    contagem_minima = y_train.value_counts().min()
-    k_neighbors = max(1, min(5, contagem_minima - 1))
-
-    if estrategia == "smote":
-        balanceador = SMOTE(random_state=42, k_neighbors=k_neighbors)
-    elif estrategia == "adasyn":
-        balanceador = ADASYN(random_state=42, n_neighbors=k_neighbors)
-    else:
-        raise ValueError(f"Estrategia de balanceamento desconhecida: {estrategia}")
-
-    X_bal, y_bal = balanceador.fit_resample(X_train, y_train)
-    return X_bal, y_bal
-
-
-def treinar_e_avaliar(nome: str, modelo_base, grid: dict, X_train, X_test, y_train, y_test, usa_scaler: bool, usa_label_encoder: bool, estrategia_balanceamento: str, label_encoder=None, cv_splits: int = 3):
+def montar_pipeline(modelo_base, estrategia: str, usa_scaler: bool, k_neighbors: int) -> ImbPipeline:
     """
-        Faz tuning de hiperparametros via GridSearchCV com validacao cruzada estratificada sobre o conjunto de treino, depois avalia o melhor modelo encontrado no conjunto de teste.
+        Pipeline imblearn (scaler opcional + balanceamento opcional + classificador).
     """
+    etapas = []
     if usa_scaler:
-        scaler = StandardScaler()
-        X_train_proc = pd.DataFrame(scaler.fit_transform(X_train), columns=["spo2", "fc", "temp"])
-        X_test_proc = pd.DataFrame(scaler.transform(X_test), columns=["spo2", "fc", "temp"])
-    else:
-        scaler = None
-        X_train_proc = X_train
-        X_test_proc = X_test
+        etapas.append(("scaler", StandardScaler()))
+    if estrategia == "smote":
+        etapas.append(("balanceamento", SMOTE(random_state=42, k_neighbors=k_neighbors)))
+    elif estrategia == "adasyn":
+        etapas.append(("balanceamento", ADASYN(random_state=42, n_neighbors=k_neighbors)))
+    elif estrategia != "none":
+        raise ValueError(f"Estrategia de balanceamento desconhecida: {estrategia}")
+    etapas.append(("clf", modelo_base))
+    return ImbPipeline(etapas)
 
-    if usa_label_encoder:
-        y_train_proc = label_encoder.transform(y_train)
-    else:
-        y_train_proc = y_train
+# def balancear_treino(X_train, y_train, estrategia: str):
+#     """
+#         Aplica a estrategia de balanceamento escolhida SOMENTE no treino.
 
-    X_train_bal, y_train_bal = balancear_treino(
-        pd.DataFrame(X_train_proc, columns=["spo2", "fc", "temp"]) if not hasattr(X_train_proc, "columns") else X_train_proc,
-        pd.Series(y_train_proc).reset_index(drop=True),
-        estrategia_balanceamento,
-    )
+#         "none": retorna os dados originais, sem alteracao (o balanceamento nesse caso fica a cargo do class_weight="balanced" dentro do proprio modelo, ja configurado em MODELOS_E_GRIDS).
+#         "smote": gera exemplos sinteticos das classes minoritarias por interpolacao entre k vizinhos mais proximos reais.
+#         "adasyn": como o SMOTE, mas concentra a geracao de exemplos sinteticos perto da fronteira de decisao.
+#     """
+#     if estrategia == "none":
+#         return X_train, y_train
 
-    cv = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=42)
-    busca = GridSearchCV(
-        modelo_base, grid, scoring="f1_macro", cv=cv, n_jobs=-1
-    )
-    busca.fit(X_train_bal, y_train_bal)
+#     contagem_minima = y_train.value_counts().min()
+#     k_neighbors = max(1, min(5, contagem_minima - 1))
+
+#     if estrategia == "smote":
+#         balanceador = SMOTE(random_state=42, k_neighbors=k_neighbors)
+#     elif estrategia == "adasyn":
+#         balanceador = ADASYN(random_state=42, n_neighbors=k_neighbors)
+#     else:
+#         raise ValueError(f"Estrategia de balanceamento desconhecida: {estrategia}")
+
+#     X_bal, y_bal = balanceador.fit_resample(X_train, y_train)
+#     return X_bal, y_bal
+
+
+def treinar_e_avaliar(nome, modelo_base, grid, estrategia, X_train, X_test, y_train, y_test, grupos_train, label_encoder, cv_splits=3):
+    """
+        Faz tuning de hiperparametros via GridSearchCV com validacao cruzada estratificada E AGRUPADA POR PACIENTE sobre o conjunto de treino, depois avalia o melhor modelo encontrado no conjunto de teste (pacientes nunca vistos durante o treino/tuning).
+    """
+    usa_scaler = nome == "LogisticRegression"
+    y_train_enc = label_encoder.transform(y_train)
+    y_test_enc = label_encoder.transform(y_test)
+
+    k_neighbors = k_neighbors_seguro(y_train_enc)
+    pipeline = montar_pipeline(modelo_base, estrategia, usa_scaler, k_neighbors)
+
+    n_grupos_treino = grupos_train.nunique()
+    splits_possiveis = min(cv_splits, n_grupos_treino)
+    if splits_possiveis < 2:
+        raise ValueError(
+            f"Apenas {n_grupos_treino} paciente(s) no treino -- "
+            "impossivel fazer validacao cruzada agrupada."
+        )
+    cv = StratifiedGroupKFold(n_splits=splits_possiveis, shuffle=True, random_state=42)
+
+    busca = GridSearchCV(pipeline, grid, scoring="f1_macro", cv=cv, n_jobs=-1)
+    busca.fit(X_train, y_train_enc, groups=grupos_train)
     modelo = busca.best_estimator_
 
-    print(f"\n--- {nome} | balanceamento={estrategia_balanceamento} ---")
-    print(f"Melhores hiperparametros (via GridSearchCV, {cv_splits}-fold): {busca.best_params_}")
-    print(f"F1 macro medio na validacao cruzada (treino): {busca.best_score_:.3f}")
+    print(f"\n--- {nome} | balanceamento={estrategia} ---")
+    print(
+        f"Melhores hiperparametros (GridSearchCV, {splits_possiveis}-fold agrupado "
+        f"por paciente): {busca.best_params_}"
+    )
+    print(f"F1 macro medio na CV agrupada (treino): {busca.best_score_:.3f}")
 
-    y_pred_raw = modelo.predict(X_test_proc)
-    y_pred = label_encoder.inverse_transform(y_pred_raw) if usa_label_encoder else y_pred_raw
+    y_pred_enc = modelo.predict(X_test)
+    y_pred = label_encoder.inverse_transform(y_pred_enc)
 
     metricas = {
         "modelo": nome,
-        "balanceamento": estrategia_balanceamento,
+        "balanceamento": estrategia,
         "f1_macro_cv_treino": busca.best_score_,
-        "acuracia": accuracy_score(y_test, y_pred),
-        "precisao_macro": precision_score(y_test, y_pred, average="macro", zero_division=0),
-        "recall_macro": recall_score(y_test, y_pred, average="macro", zero_division=0),
-        "f1_macro": f1_score(y_test, y_pred, average="macro", zero_division=0),
+        "acuracia_teste": accuracy_score(y_test, y_pred),
+        "precisao_macro_teste": precision_score(y_test, y_pred, average="macro", zero_division=0),
+        "recall_macro_teste": recall_score(y_test, y_pred, average="macro", zero_division=0),
+        "f1_macro_teste": f1_score(y_test, y_pred, average="macro", zero_division=0),
     }
 
-    print("Desempenho no conjunto de teste (holdout):")
+    print("Desempenho no conjunto de teste (holdout, pacientes nunca vistos no treino):")
     print(classification_report(y_test, y_pred, zero_division=0))
 
-    return metricas, modelo, scaler
-
+    return metricas, modelo
 
 def main():
     parser = argparse.ArgumentParser(description="Treina e compara modelos de risco clinico.")
     parser.add_argument("--dataset", default="dataset_treino.csv", help="CSV gerado por prepare_data.py")
-    parser.add_argument("--out-model", default="model.pkl", help="Caminho do modelo final (melhor dos 3) a ser salvo")
-    parser.add_argument("--out-metrics", default="metricas_comparativo.csv", help="CSV com a tabela comparativa de metricas")
+    parser.add_argument("--out-model", default="model.pkl", help="Caminho do modelo final a ser salvo")
+    parser.add_argument("--out-metrics", default="metricas_comparativo.csv", help="CSV com a tabela comparativa")
+    parser.add_argument("--test-size", type=float, default=0.2, help="Fracao de PACIENTES reservada para teste")
+    parser.add_argument("--cv-splits", type=int, default=3, help="Numero de folds da CV interna (GridSearchCV)")
+    parser.add_argument(
+        "--modelo", choices=list(MODELOS_E_GRIDS.keys()), default=None,
+        help=(
+            "Se informado (junto com --balanceamento), PULA a comparacao completa "
+            "e treina/exporta diretamente essa combinacao. Use o valor impresso por "
+            "gerar_relatorio.py como 'melhor combinacao' para garantir que o modelo "
+            "exportado para producao seja o mesmo identificado como melhor no "
+            "relatorio do artigo."
+        ),
+    )
+    parser.add_argument("--balanceamento", choices=["none", "smote", "adasyn"], default=None)
     args = parser.parse_args()
 
+    if (args.modelo is None) != (args.balanceamento is None):
+        parser.error("--modelo e --balanceamento devem ser usados juntos (ou nenhum dos dois).")
+
     print(f"Carregando dataset: {args.dataset}")
-    X, y = carregar_dados(args.dataset)
-    print(f"Total de amostras: {len(X)}")
+    X, y, grupos = carregar_dados(args.dataset)
+    print(f"Total de amostras: {len(X)} | Pacientes (grupos) unicos: {grupos.nunique()}")
     print("Distribuicao de classes:")
     print(y.value_counts())
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    splitter = GroupShuffleSplit(n_splits=1, test_size=args.test_size, random_state=42)
+    idx_train, idx_test = next(splitter.split(X, y, groups=grupos))
+    X_train, X_test = X.iloc[idx_train], X.iloc[idx_test]
+    y_train, y_test = y.iloc[idx_train], y.iloc[idx_test]
+    grupos_train = grupos.iloc[idx_train]
+    grupos_test = grupos.iloc[idx_test]
 
-    resultados = []
-    modelos_treinados = {}
+    sobreposicao = set(grupos_train) & set(grupos_test)
+    assert not sobreposicao, f"Vazamento de paciente entre treino e teste! Grupos em comum: {sobreposicao}"
+    print(
+        f"Split treino/teste agrupado por paciente: {len(X_train)} linhas / "
+        f"{grupos_train.nunique()} pacientes no treino, {len(X_test)} linhas / "
+        f"{grupos_test.nunique()} pacientes no teste. Nenhum paciente em comum (verificado)."
+    )
 
     label_encoder = LabelEncoder()
-    label_encoder.fit(y_train)
+    label_encoder.fit(y)
 
-    estrategias_balanceamento = ["none", "smote", "adasyn"]
+    if args.modelo is not None:
+        modelo_base, grid = MODELOS_E_GRIDS[args.modelo]
+        metricas, modelo_treinado = treinar_e_avaliar(
+            args.modelo, modelo_base, grid, args.balanceamento,
+            X_train, X_test, y_train, y_test, grupos_train, label_encoder, args.cv_splits,
+        )
+        pd.DataFrame([metricas]).to_csv(args.out_metrics, index=False)
+        melhor_nome, melhor_estrategia, melhor_modelo = args.modelo, args.balanceamento, modelo_treinado
 
-    for estrategia in estrategias_balanceamento:
-        for nome, (modelo_base, grid) in MODELOS_E_GRIDS.items():
-            usa_scaler = nome == "LogisticRegression"
-            usa_label_encoder = nome == "XGBoost"
-            metricas, modelo_treinado, scaler = treinar_e_avaliar(
-                nome, modelo_base, grid, X_train, X_test, y_train, y_test,
-                usa_scaler, usa_label_encoder, estrategia, label_encoder
-            )
-            resultados.append(metricas)
-            chave = f"{nome}__{estrategia}"
-            modelos_treinados[chave] = (modelo_treinado, scaler, nome)
+    else:
+        resultados = []
+        modelos_treinados = {}
+        for estrategia in ["none", "smote", "adasyn"]:
+            for nome, (modelo_base, grid) in MODELOS_E_GRIDS.items():
+                metricas, modelo_treinado = treinar_e_avaliar(
+                    nome, modelo_base, grid, estrategia,
+                    X_train, X_test, y_train, y_test, grupos_train, label_encoder, args.cv_splits,
+                )
+                resultados.append(metricas)
+                modelos_treinados[f"{nome}__{estrategia}"] = modelo_treinado
 
-    tabela_resultados = pd.DataFrame(resultados).sort_values("f1_macro_cv_treino", ascending=False)
-    print("\n=== Tabela comparativa final ===")
-    print(tabela_resultados.to_string(index=False))
+        tabela_resultados = pd.DataFrame(resultados).sort_values("f1_macro_teste", ascending=False)
+        print("\n=== Tabela comparativa final (ordenada por F1 macro NO HOLDOUT DE TESTE) ===")
+        print(tabela_resultados.to_string(index=False))
+        tabela_resultados.to_csv(args.out_metrics, index=False)
+        print(f"\nTabela de metricas salva em: {args.out_metrics}")
 
-    tabela_resultados.to_csv(args.out_metrics, index=False)
-    print(f"\nTabela de metricas salva em: {args.out_metrics}")
+        melhor_linha = tabela_resultados.iloc[0]
+        melhor_nome = melhor_linha["modelo"]
+        melhor_estrategia = melhor_linha["balanceamento"]
+        melhor_modelo = modelos_treinados[f"{melhor_nome}__{melhor_estrategia}"]
 
-    melhor_linha = tabela_resultados.iloc[0]
-    melhor_nome = melhor_linha["modelo"]
-    melhor_estrategia = melhor_linha["balanceamento"]
-    chave_melhor = f"{melhor_nome}__{melhor_estrategia}"
-    melhor_modelo, melhor_scaler, _ = modelos_treinados[chave_melhor]
+        print(
+            f"\nMelhor combinacao por F1 macro no HOLDOUT DE TESTE: {melhor_nome} + "
+            f"balanceamento={melhor_estrategia}.\n"
+        )
 
-    print(f"\nMelhor combinacao: {melhor_nome} + balanceamento={melhor_estrategia} -> salvando como {args.out_model}")
-    precisa_label_encoder = melhor_nome == "XGBoost"
+    print(f"\nSalvando modelo final ({melhor_nome} + {melhor_estrategia}) em: {args.out_model}")
     joblib.dump(
         {
             "modelo": melhor_modelo,
-            "scaler": melhor_scaler,
-            "label_encoder": label_encoder if precisa_label_encoder else None,
+            "label_encoder": label_encoder,
             "nome": melhor_nome,
             "balanceamento": melhor_estrategia,
+            "features": FEATURES,
         },
         args.out_model,
     )
