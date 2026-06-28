@@ -87,8 +87,8 @@ def treinar_e_avaliar(nome: str, modelo_base, grid: dict, X_train, X_test, y_tra
     """
     if usa_scaler:
         scaler = StandardScaler()
-        X_train_proc = scaler.fit_transform(X_train)
-        X_test_proc = scaler.transform(X_test)
+        X_train_proc = pd.DataFrame(scaler.fit_transform(X_train), columns=["spo2", "fc", "temp"])
+        X_test_proc = pd.DataFrame(scaler.transform(X_test), columns=["spo2", "fc", "temp"])
     else:
         scaler = None
         X_train_proc = X_train
@@ -170,7 +170,7 @@ def main():
             chave = f"{nome}__{estrategia}"
             modelos_treinados[chave] = (modelo_treinado, scaler, nome)
 
-    tabela_resultados = pd.DataFrame(resultados).sort_values("f1_macro", ascending=False)
+    tabela_resultados = pd.DataFrame(resultados).sort_values("f1_macro_cv_treino", ascending=False)
     print("\n=== Tabela comparativa final ===")
     print(tabela_resultados.to_string(index=False))
 
