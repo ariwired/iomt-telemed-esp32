@@ -138,7 +138,7 @@ def treinar_e_avaliar(nome: str, modelo_base, grid: dict, X_train, X_test, y_tra
 def main():
     parser = argparse.ArgumentParser(description="Treina e compara modelos de risco clinico.")
     parser.add_argument("--dataset", default="dataset_treino.csv", help="CSV gerado por prepare_data.py")
-    parser.add_argument("--out-model", default="random_forest_model.pkl", help="Caminho do modelo final (melhor dos 3) a ser salvo")
+    parser.add_argument("--out-model", default="model.pkl", help="Caminho do modelo final (melhor dos 3) a ser salvo")
     parser.add_argument("--out-metrics", default="metricas_comparativo.csv", help="CSV com a tabela comparativa de metricas")
     args = parser.parse_args()
 

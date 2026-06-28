@@ -6,7 +6,7 @@ import os
 
 app = FastAPI(title="IA Preditiva")
 
-MODEL_PATH = "random_forest_model.pkl"
+MODEL_PATH = "model.pkl"
 
 if not os.path.exists(MODEL_PATH):
     raise RuntimeError(f"Arquivo {MODEL_PATH} não encontrado. Rode train.py primeiro.")
