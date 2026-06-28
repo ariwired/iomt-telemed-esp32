@@ -96,24 +96,23 @@ def filtrar_fisiologicamente_plausivel(df: pd.DataFrame) -> pd.DataFrame:
 
 def calcular_risco_news2(spo2: float, fc: float, temp: float) -> str:
     """
-    Escore de risco baseado nos componentes de SpO2, frequencia cardiaca
-    e temperatura do National Early Warning Score 2 (NEWS2), um escore de
-    alerta precoce clinico padronizado e amplamente usado como referencia
-    em estudos de predicao de deterioracao clinica (ver DOC_MODELO.md para
-    as referencias). Esta e uma versao SIMPLIFICADA: o NEWS2 completo usa
-    tambem frequencia respiratoria, pressao arterial e nivel de consciencia,
-    que nao fazem parte dos sensores deste projeto.
+    Escore de risco baseado nos componentes de SpO2, frequencia cardiaca e temperatura do National Early Warning Score 2 (NEWS2), um escore de alerta precoce clinico padronizado e amplamente usado como referencia em estudos de predicao de deterioracao clinica.
+    Esta e uma versao SIMPLIFICADA: o NEWS2 completo usa tambem frequencia respiratoria, pressao arterial e nivel de consciencia, que nao fazem parte dos sensores deste projeto.
 
-    Pontuacao por faixa (adaptado do NEWS2):
-    - SpO2:   <=91 -> 3 | 92-93 -> 2 | 94-95 -> 1 | >=96 -> 0
-    - FC:     <=40 ou >=131 -> 3 | 111-130 -> 2 | 41-50 ou 91-110 -> 1 | 51-90 -> 0
-    - Temp:   <=35.0 -> 3 | 35.1-36.0 ou >=39.1 -> 1 | 38.1-39.0 -> 1 | 36.1-38.0 -> 0
+    Pontuacao por faixa (adaptado do NEWS2 oficial -- Royal College of Physicians):
+    - SpO2:  <=91 -> 3 | 92-93 -> 2 | 94-95 -> 1 | >=96 -> 0
+    - FC:    <=40 ou >=131 -> 3 | 111-130 -> 2 | 41-50 ou 91-110 -> 1 | 51-90 -> 0
+    - Temp:  <=35.0 -> 3 | 35.1-36.0 -> 1 | 36.1-38.0 -> 0 | 38.1-39.0 -> 1 | >=39.1 -> 2
+
+    versao resumida pt-br: (https://med.estrategia.com/portal/conteudos-gratis/procedimentos/resumo-de-news-score-2-criterios-interpretacao-e-mais/)
 
     Classificacao final (soma dos 3 componentes, 0-9):
       0-1  -> LOW
       2-3  -> MEDIUM
       4-5  -> HIGH
       6+   -> CRITICAL
+
+    NOTA: Este rotulo é uma funcao DETERMINISTICA de spo2, fc e temp. Exatamente as MESMAS 3 variaveis usadas como entrada do modelo de ML. Ou seja, formalmente, risco aqui pode ser calculado por uma formula direta, sem qualquer aprendizado de maquina. O papel do classificador, neste desenho, e aprender a RECONSTRUIR essa formula a partir de exemplos. Essas metricas NAO devem ser lidas como "o quao bem o modelo prediz risco clinico real", elas medem o quao bem o modelo reconstrui o NEWS2 simplificado a partir de sinais possivelmente ruidosos.
     """
     score = 0
 
@@ -133,10 +132,14 @@ def calcular_risco_news2(spo2: float, fc: float, temp: float) -> str:
 
     if temp <= 35.0:
         score += 3
-    elif temp <= 36.0 or temp >= 39.1:
+    elif temp <= 36.0:
         score += 1
-    elif temp <= 39.0 and temp >= 38.1:
+    elif temp <= 38.0:
+        score += 0
+    elif temp <= 39.0:
         score += 1
+    else:
+        score += 2
 
     if score >= 6:
         return "CRITICAL"
@@ -184,10 +187,16 @@ def main():
             print(f"Agrupando {n_critical} caso(s) CRITICAL em HIGH")
             tabela["risco"] = tabela["risco"].replace({"CRITICAL": "HIGH"})
 
-    saida = tabela[["spo2", "fc", "temp", "risco"]].reset_index(drop=True)
+    saida = tabela[["icustay_id", "spo2", "fc", "temp", "risco"]].reset_index(drop=True)
 
     print("\nDistribuicao de classes geradas:")
     print(saida["risco"].value_counts())
+    print(f"\nPacientes (icustay_id) unicos no dataset: {saida['icustay_id'].nunique()}")
+    
+    print(
+        "Media de janelas por paciente: "
+        f"{len(saida) / saida['icustay_id'].nunique():.1f}"
+    )
 
     saida.to_csv(args.out, index=False)
     print(f"\nDataset salvo em: {args.out} ({len(saida)} linhas)")
