@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import joblib
 import pandas as pd
 import os
@@ -15,24 +15,27 @@ artefato = joblib.load(MODEL_PATH)
 
 if isinstance(artefato, dict):
     model = artefato["modelo"]
-    scaler = artefato.get("scaler")
     label_encoder = artefato.get("label_encoder")
     nome_modelo = artefato.get("nome", "desconhecido")
     balanceamento = artefato.get("balanceamento", "none")
+    features = artefato.get("features", ["spo2", "fc", "temp"])
 else:
     model = artefato
-    scaler = None
     label_encoder = None
-    nome_modelo = "RandomForest (formato legado)"
+    nome_modelo = "modelo (formato legado)"
     balanceamento = "desconhecido"
+    features = ["spo2", "fc", "temp"]
 
 print(f"Modelo carregado com sucesso! ({nome_modelo}, balanceamento={balanceamento})")
 
 
 class VitalSigns(BaseModel):
-    spo2: int
-    fc: int
-    temp: float
+    """
+        Faixas (ge/le) baseadas nos mesmos limites fisiologicamente plausiveis.
+    """
+    spo2: float = Field(..., ge=50, le=100, description="Saturação de oxigênio (%)")
+    fc: float = Field(..., ge=20, le=250, description="Frequência cardíaca (bpm)")
+    temp: float = Field(..., ge=25, le=45, description="Temperatura corporal (°C)")
 
 
 @app.post("/predict")
@@ -43,13 +46,11 @@ def predict_risk(vitals: VitalSigns):
         "spo2": vitals.spo2,
         "fc": vitals.fc,
         "temp": vitals.temp,
-    }])
+    }])[features]
 
     try:
-        input_processado = scaler.transform(input_data) if scaler is not None else input_data
-
-        prediction_raw = model.predict(input_processado)[0]
-        probabilities = model.predict_proba(input_processado)[0]
+        prediction_raw = model.predict(input_data)[0]
+        probabilities = model.predict_proba(input_data)[0]
         confidence_score = max(probabilities)
 
         if label_encoder is not None:
