@@ -1,6 +1,6 @@
 """
 Avaliacao mais rigorosa dos 3 modelos x 3 estrategias de balanceamento, esse script realiza:
-1. Tabela comparativa com media +/- desvio padrao via validacao cruzada aninhada repetida.
+1. Tabela comparativa com media +/- desvio padrao via validacao cruzada aninhada repetida, agrupada por paciente (icustay_id).
 2. Tabela em formato Markdown.
 3. Matriz de confusao do modelo vencedor.
 4. Curva ROC multiclasse (one-vs-rest) do modelo vencedor.
@@ -8,8 +8,10 @@ Avaliacao mais rigorosa dos 3 modelos x 3 estrategias de balanceamento, esse scr
 
 Este script usa validacao cruzada aninhada repetida (outer loop avalia, inner loop ajusta hiperparametros) sobre todo o dataset, o que:
 - Usa todos os 904 exemplos para avaliar (nao so 181 do holdout).
-- Cada amostra aparece no conjunto de teste em algum momento, varias vezes, entao o resultado final e uma MEDIA de varias divisoes diferentes, nao depende de uma unica divisao "sortuda" ou "azarada".
+- Cada amostra aparece no conjunto de teste em algum momento, varias vezes, entao o resultado final é uma MEDIA de varias divisoes diferentes, nao depende de uma unica divisao "sortuda" ou "azarada".
 - Reporta desvio padrao, podendo usar "F1 macro = 0.93 +/- 0.04" em vez de um numero unico sem contexto de incerteza.
+
+NOTA: O rotulo "risco" é uma funcao DETERMINISTICA das 3 features usadas como entrada do modelo. Não é evidencia de que o modelo capture risco clinico real, e sim de que ele reconstroi bem o NEWS2 simplificado a partir de sinais possivelmente ruidosos.
 
 Uso:
     python gerar_relatorio_artigo.py --dataset dataset_treino.csv
@@ -17,7 +19,6 @@ Uso:
 
 import argparse
 import warnings
-import joblib
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -26,7 +27,7 @@ import matplotlib.pyplot as plt
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import RepeatedStratifiedKFold, StratifiedKFold, GridSearchCV, cross_val_predict
+from sklearn.model_selection import StratifiedGroupKFold, GridSearchCV, cross_val_predict
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, roc_curve, auc
 
 from sklearn.preprocessing import StandardScaler, LabelEncoder, label_binarize
@@ -35,6 +36,8 @@ from imblearn.over_sampling import SMOTE, ADASYN
 from imblearn.pipeline import Pipeline as ImbPipeline
 
 warnings.filterwarnings("ignore", category=UserWarning)
+
+FEATURES = ["spo2", "fc", "temp"]
 
 MODELOS_E_GRIDS = {
     "RandomForest": (
@@ -54,58 +57,88 @@ MODELOS_E_GRIDS = {
 ESTRATEGIAS_BALANCEAMENTO = ["none", "smote", "adasyn"]
 
 
-def montar_pipeline(nome_modelo: str, modelo_base, estrategia: str, usa_scaler: bool):
+def carregar_dados(caminho_csv: str):
+    df = pd.read_csv(caminho_csv)
+
+    faltando = {"spo2", "fc", "temp", "risco"} - set(df.columns)
+    if faltando:
+        raise ValueError(f"Coluna(s) obrigatoria(s) faltando no dataset: {faltando}")
+
+    if "icustay_id" not in df.columns:
+        grupos = pd.Series(range(len(df)))
+    else:
+        grupos = df["icustay_id"]
+
+    X = df[FEATURES]
+    y = df["risco"]
+    return X, y, grupos
+
+
+def k_neighbors_seguro(y_encoded, maximo=3) -> int:
+    contagem_minima = pd.Series(y_encoded).value_counts().min()
+    return max(1, min(maximo, contagem_minima - 1))
+
+
+def montar_pipeline(modelo_base, estrategia: str, usa_scaler: bool, k_neighbors: int) -> ImbPipeline:
     """
-        Monta um pipeline imblearn (scaler opcional + balanceamento opcional + classificador), para que SMOTE/ADASYN sejam aplicados corretamente DENTRO de cada fold da validacao cruzada, nunca antes do split, e nunca no fold de teste de cada iteracao. Isso evita vazamento de dados sinteticos entre treino e teste em QUALQUER fold.
+        Pipeline imblearn (scaler opcional + balanceamento opcional + classificador), para que SMOTE/ADASYN sejam aplicados corretamente DENTRO de cada fold da validacao cruzada, nunca antes do split, e nunca no fold de teste/validacao. Isso evita vazamento de dados sinteticos entre treino e teste em QUALQUER fold.
     """
     etapas = []
     if usa_scaler:
         etapas.append(("scaler", StandardScaler()))
     if estrategia == "smote":
-        etapas.append(("balanceamento", SMOTE(random_state=42, k_neighbors=3)))
+        etapas.append(("balanceamento", SMOTE(random_state=42, k_neighbors=k_neighbors)))
     elif estrategia == "adasyn":
-        etapas.append(("balanceamento", ADASYN(random_state=42, n_neighbors=3)))
+        etapas.append(("balanceamento", ADASYN(random_state=42, n_neighbors=k_neighbors)))
     etapas.append(("clf", modelo_base))
     return ImbPipeline(etapas)
 
 
-def avaliar_combo_nested_cv(nome_modelo, modelo_base, grid, estrategia, X, y_encoded, n_splits=5, n_repeats=5, inner_splits=3):
+def avaliar_combo_grouped_cv(nome_modelo, modelo_base, grid, estrategia, X, y_encoded, grupos, n_splits=5, n_repeats=5, inner_splits=3):
     """
-        Validacao cruzada aninhada repetida:
-        - outer: RepeatedStratifiedKFold (n_splits x n_repeats divisoes diferentes de treino/teste sobre todo o dataset).
-        - inner: GridSearchCV (StratifiedKFold) dentro de cada fold de treino do outer, para ajustar hiperparametros sem usar o fold de teste daquela iteracao.
+        Validacao cruzada aninhada, agrupada por paciente, repetida:
+        - outer: StratifiedGroupKFold, repetido n_repeats vezes com seeds diferentes (cada paciente fica inteiro de um lado do split -- treino OU teste, nunca os dois).
+        - inner: GridSearchCV com StratifiedGroupKFold dentro de cada fold de treino do outer, para ajustar hiperparametros sem usar o fold de teste daquela iteracao.
 
-        Retorna a lista de metricas de cada uma das (n_splits x n_repeats) iteracoes outer, para depois calcular media e desvio padrao.
+        Retorna a lista de metricas de cada iteracao outer (n_splits x n_repeats no maximo), para depois calcular media e desvio padrao.
     """
     usa_scaler = nome_modelo == "LogisticRegression"
-    pipeline = montar_pipeline(nome_modelo, modelo_base, estrategia, usa_scaler)
-
-    outer_cv = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=42)
-    inner_cv = StratifiedKFold(n_splits=inner_splits, shuffle=True, random_state=42)
+    k_neighbors = k_neighbors_seguro(y_encoded)
+    pipeline = montar_pipeline(modelo_base, estrategia, usa_scaler, k_neighbors)
 
     resultados_fold = []
 
-    for fold_idx, (idx_train, idx_test) in enumerate(outer_cv.split(X, y_encoded)):
-        X_train, X_test = X.iloc[idx_train], X.iloc[idx_test]
-        y_train, y_test = y_encoded[idx_train], y_encoded[idx_test]
+    for repeticao in range(n_repeats):
+        outer_cv = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=42 + repeticao)
 
-        busca = GridSearchCV(pipeline, grid, scoring="f1_macro", cv=inner_cv, n_jobs=-1)
-        busca.fit(X_train, y_train)
-        y_pred = busca.predict(X_test)
+        for idx_train, idx_test in outer_cv.split(X, y_encoded, groups=grupos):
+            X_train, X_test = X.iloc[idx_train], X.iloc[idx_test]
+            y_train, y_test = y_encoded[idx_train], y_encoded[idx_test]
+            grupos_train = grupos.iloc[idx_train]
 
-        resultados_fold.append({
-            "acuracia": accuracy_score(y_test, y_pred),
-            "precisao_macro": precision_score(y_test, y_pred, average="macro", zero_division=0),
-            "recall_macro": recall_score(y_test, y_pred, average="macro", zero_division=0),
-            "f1_macro": f1_score(y_test, y_pred, average="macro", zero_division=0),
-        })
+            n_grupos_treino = grupos_train.nunique()
+            splits_inner = min(inner_splits, n_grupos_treino)
+            if splits_inner < 2:
+                continue
+
+            inner_cv = StratifiedGroupKFold(n_splits=splits_inner, shuffle=True, random_state=42)
+            busca = GridSearchCV(pipeline, grid, scoring="f1_macro", cv=inner_cv, n_jobs=-1)
+            busca.fit(X_train, y_train, groups=grupos_train)
+            y_pred = busca.predict(X_test)
+
+            resultados_fold.append({
+                "acuracia": accuracy_score(y_test, y_pred),
+                "precisao_macro": precision_score(y_test, y_pred, average="macro", zero_division=0),
+                "recall_macro": recall_score(y_test, y_pred, average="macro", zero_division=0),
+                "f1_macro": f1_score(y_test, y_pred, average="macro", zero_division=0),
+            })
 
     return resultados_fold
 
 
 def resumir_resultados(nome_modelo, estrategia, resultados_fold):
     df = pd.DataFrame(resultados_fold)
-    resumo = {"modelo": nome_modelo, "balanceamento": estrategia}
+    resumo = {"modelo": nome_modelo, "balanceamento": estrategia, "n_avaliacoes": len(df)}
     for col in ["acuracia", "precisao_macro", "recall_macro", "f1_macro"]:
         resumo[f"{col}_media"] = df[col].mean()
         resumo[f"{col}_std"] = df[col].std()
@@ -130,23 +163,26 @@ def gerar_tabela_markdown(tabela: pd.DataFrame, caminho_saida: str):
     return conteudo
 
 
-def gerar_figuras_modelo_vencedor(nome_modelo, modelo_base, grid, estrategia, X, y_encoded, label_encoder, prefixo_saida):
+def gerar_figuras_modelo_vencedor(nome_modelo, modelo_base, grid, estrategia, X, y_encoded, grupos, label_encoder, prefixo_saida):
     """
-    Treina o modelo vencedor com tuning de hiperparametros e gera, usando cross_val_predict (previsoes obtidas honestamente fora-da-amostra, fold a fold):
+    Treina o modelo vencedor com tuning de hiperparametros (CV agrupada por paciente) e gera, usando cross_val_predict (previsoes obtidas fora-da-amostra, fold a fold, respeitando os grupos):
     - matriz de confusao
     - curva ROC multiclasse (one-vs-rest)
     - importancia de features
     """
     usa_scaler = nome_modelo == "LogisticRegression"
-    pipeline = montar_pipeline(nome_modelo, modelo_base, estrategia, usa_scaler)
+    k_neighbors = k_neighbors_seguro(y_encoded)
+    pipeline = montar_pipeline(modelo_base, estrategia, usa_scaler, k_neighbors)
 
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    n_splits = min(5, grupos.nunique())
+    cv = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=42)
+
     busca = GridSearchCV(pipeline, grid, scoring="f1_macro", cv=cv, n_jobs=-1)
-    busca.fit(X, y_encoded)
+    busca.fit(X, y_encoded, groups=grupos)
     melhor_pipeline = busca.best_estimator_
 
-    y_pred = cross_val_predict(melhor_pipeline, X, y_encoded, cv=cv, n_jobs=-1)
-    y_proba = cross_val_predict(melhor_pipeline, X, y_encoded, cv=cv, method="predict_proba", n_jobs=-1)
+    y_pred = cross_val_predict(melhor_pipeline, X, y_encoded, groups=grupos, cv=cv, n_jobs=-1)
+    y_proba = cross_val_predict(melhor_pipeline, X, y_encoded, groups=grupos, cv=cv, method="predict_proba", n_jobs=-1)
 
     classes = label_encoder.classes_
 
@@ -159,7 +195,7 @@ def gerar_figuras_modelo_vencedor(nome_modelo, modelo_base, grid, estrategia, X,
     ax.set_yticklabels(classes)
     ax.set_xlabel("Predito")
     ax.set_ylabel("Real")
-    ax.set_title(f"Matriz de confusão — {nome_modelo} + {estrategia}\n(previsões fora-da-amostra, 5-fold)")
+    ax.set_title(f"Matriz de confusão — {nome_modelo} + {estrategia}\n(previsões fora-da-amostra, {n_splits}-fold agrupado por paciente)")
 
     for i in range(len(classes)):
         for j in range(len(classes)):
@@ -209,34 +245,32 @@ def main():
     parser.add_argument("--out-prefix", default="relatorio")
     args = parser.parse_args()
 
-    df = pd.read_csv(args.dataset)
-    X = df[["spo2", "fc", "temp"]]
-    y = df["risco"]
+    X, y, grupos = carregar_dados(args.dataset)
 
     label_encoder = LabelEncoder()
     y_encoded = label_encoder.fit_transform(y)
 
-    print(f"Dataset: {len(df)} amostras. Classes: {dict(y.value_counts())}")
-    print(f"Avaliando 9 combinacoes via validacao cruzada aninhada repetida "
-          f"(5-fold outer x {args.n_repeats} repeticoes = {5*args.n_repeats} avaliacoes por combinacao)...\n")
+    print(f"Dataset: {len(X)} amostras | {grupos.nunique()} pacientes (grupos) unicos. Classes: {dict(y.value_counts())}")
+    print(
+        f"Avaliando 9 combinacoes via CV aninhada agrupada por paciente, repetida "
+        f"(5-fold outer x {args.n_repeats} repeticoes)...\n"
+    )
 
-    todos_resultados = []
     resumos = []
 
     for estrategia in ESTRATEGIAS_BALANCEAMENTO:
         for nome_modelo, (modelo_base, grid) in MODELOS_E_GRIDS.items():
             print(f"  -> {nome_modelo} + {estrategia} ...")
-            resultados_fold = avaliar_combo_nested_cv(
-                nome_modelo, modelo_base, grid, estrategia, X, y_encoded,
+            resultados_fold = avaliar_combo_grouped_cv(
+                nome_modelo, modelo_base, grid, estrategia, X, y_encoded, grupos,
                 n_repeats=args.n_repeats,
             )
-            todos_resultados.append((nome_modelo, estrategia, resultados_fold))
             resumos.append(resumir_resultados(nome_modelo, estrategia, resultados_fold))
 
     tabela = pd.DataFrame(resumos).sort_values("f1_macro_media", ascending=False).reset_index(drop=True)
 
-    print("\n=== Tabela final (validação cruzada aninhada repetida, média ± desvio padrão) ===")
-    print(tabela[["modelo", "balanceamento", "acuracia_media", "f1_macro_media", "f1_macro_std"]].to_string(index=False))
+    print("\n=== Tabela final (CV aninhada agrupada por paciente, média ± desvio padrão) ===")
+    print(tabela[["modelo", "balanceamento", "n_avaliacoes", "acuracia_media", "f1_macro_media", "f1_macro_std"]].to_string(index=False))
 
     tabela.to_csv(f"{args.out_prefix}_tabela_completa.csv", index=False)
     markdown = gerar_tabela_markdown(tabela, f"{args.out_prefix}_tabela.md")
@@ -246,12 +280,16 @@ def main():
     melhor = tabela.iloc[0]
     melhor_nome = melhor["modelo"]
     melhor_estrategia = melhor["balanceamento"]
-    print(f"\nMelhor combinação (por F1 macro médio em CV): {melhor_nome} + {melhor_estrategia}")
+    print(f"\nMelhor combinação (por F1 macro médio em CV agrupada por paciente): {melhor_nome} + {melhor_estrategia}")
+    print(
+        "\nPara exportar EXATAMENTE este modelo para producao rode:\n"
+        f"  python train.py --dataset {args.dataset} --modelo {melhor_nome} --balanceamento {melhor_estrategia}"
+    )
 
     print("\nGerando figuras do modelo vencedor...")
     modelo_base, grid = MODELOS_E_GRIDS[melhor_nome]
     melhores_params = gerar_figuras_modelo_vencedor(
-        melhor_nome, modelo_base, grid, melhor_estrategia, X, y_encoded, label_encoder, args.out_prefix
+        melhor_nome, modelo_base, grid, melhor_estrategia, X, y_encoded, grupos, label_encoder, args.out_prefix
     )
     print(f"Hiperparâmetros do modelo vencedor: {melhores_params}")
     print(f"Figuras salvas: {args.out_prefix}_matriz_confusao.png, {args.out_prefix}_curva_roc.png, "
