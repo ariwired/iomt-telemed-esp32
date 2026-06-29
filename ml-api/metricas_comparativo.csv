@@ -1,0 +1,2 @@
+modelo,balanceamento,f1_macro_cv_treino,acuracia_teste,precisao_macro_teste,recall_macro_teste,f1_macro_teste
+RandomForest,smote,0.6715823894398966,0.8235294117647058,0.7809016086793864,0.8616255144032922,0.7591402427022252

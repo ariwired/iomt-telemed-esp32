@@ -1,0 +1,76 @@
+(venv) ari@pop-os:~/iomt-telemed-esp32/ml-api$ /home/ari/iomt-telemed-esp32/ml-api/venv/bin/python /home/ari/iomt-telemed-esp32/ml-api/gerar_relatorio.py
+Dataset: 904 amostras | 12 pacientes (grupos) unicos. Classes: {'LOW': 610, 'MEDIUM': 261, 'HIGH': 33}
+Avaliando 9 combinacoes via CV aninhada agrupada por paciente, repetida (5-fold outer x 5 repeticoes)...
+
+  -> RandomForest + none ...
+  -> XGBoost + none ...
+  -> LogisticRegression + none ...
+  -> RandomForest + smote ...
+  -> XGBoost + smote ...
+  -> LogisticRegression + smote ...
+  -> RandomForest + adasyn ...
+  -> XGBoost + adasyn ...
+  -> LogisticRegression + adasyn ...
+
+=== Tabela final (CV aninhada agrupada por paciente, média ± desvio padrão) ===
+            modelo balanceamento  n_avaliacoes  acuracia_media  f1_macro_media  f1_macro_std
+      RandomForest         smote            25        0.930701        0.849118      0.116497
+      RandomForest          none            25        0.943123        0.847867      0.114961
+           XGBoost          none            25        0.944350        0.844813      0.103727
+           XGBoost         smote            25        0.933769        0.837471      0.098450
+      RandomForest        adasyn            25        0.920303        0.826727      0.127344
+           XGBoost        adasyn            25        0.916515        0.818103      0.116715
+LogisticRegression         smote            25        0.720551        0.647967      0.103751
+LogisticRegression          none            25        0.715828        0.646754      0.096561
+LogisticRegression        adasyn            25        0.703077        0.637199      0.080978
+
+Tabela Markdown salva em relatorio_tabela.md:
+
+| Modelo | Balanceamento | Acurácia | Precisão (macro) | Recall (macro) | F1 (macro) |
+|---|---|---|---|---|---|
+| RandomForest | smote | 0.931 ± 0.060 | 0.887 ± 0.054 | 0.858 ± 0.147 | 0.849 ± 0.116 |
+| RandomForest | none | 0.943 ± 0.056 | 0.896 ± 0.057 | 0.837 ± 0.139 | 0.848 ± 0.115 |
+| XGBoost | none | 0.944 ± 0.055 | 0.924 ± 0.031 | 0.825 ± 0.133 | 0.845 ± 0.104 |
+| XGBoost | smote | 0.934 ± 0.048 | 0.865 ± 0.051 | 0.863 ± 0.137 | 0.837 ± 0.098 |
+| RandomForest | adasyn | 0.920 ± 0.062 | 0.862 ± 0.087 | 0.840 ± 0.155 | 0.827 ± 0.127 |
+| XGBoost | adasyn | 0.917 ± 0.061 | 0.851 ± 0.071 | 0.845 ± 0.149 | 0.818 ± 0.117 |
+| LogisticRegression | smote | 0.721 ± 0.124 | 0.668 ± 0.094 | 0.701 ± 0.115 | 0.648 ± 0.104 |
+| LogisticRegression | none | 0.716 ± 0.123 | 0.655 ± 0.094 | 0.710 ± 0.090 | 0.647 ± 0.097 |
+| LogisticRegression | adasyn | 0.703 ± 0.093 | 0.640 ± 0.075 | 0.709 ± 0.094 | 0.637 ± 0.081 |
+
+Melhor combinação (por F1 macro médio em CV agrupada por paciente): RandomForest + smote
+
+Para exportar EXATAMENTE este modelo para producao rode:
+  python train.py --dataset dataset_treino.csv --modelo RandomForest --balanceamento smote
+
+Gerando figuras do modelo vencedor...
+Hiperparâmetros do modelo vencedor: {'clf__max_depth': 8, 'clf__n_estimators': 100}
+Figuras salvas: relatorio_matriz_confusao.png, relatorio_curva_roc.png, relatorio_feature_importance.png (se aplicável)
+(venv) ari@pop-os:~/iomt-telemed-esp32/ml-api$ python train.py --dataset dataset_treino.csv --modelo RandomForest --balanceamento smote
+Carregando dataset: dataset_treino.csv
+Total de amostras: 904 | Pacientes (grupos) unicos: 12
+Distribuicao de classes:
+risco
+LOW       610
+MEDIUM    261
+HIGH       33
+Name: count, dtype: int64
+Split treino/teste agrupado por paciente: 734 linhas / 9 pacientes no treino, 170 linhas / 3 pacientes no teste. Nenhum paciente em comum (verificado).
+
+--- RandomForest | balanceamento=smote ---
+Melhores hiperparametros (GridSearchCV, 3-fold agrupado por paciente): {'clf__max_depth': 8, 'clf__n_estimators': 100}
+F1 macro medio na CV agrupada (treino): 0.672
+Desempenho no conjunto de teste (holdout, pacientes nunca vistos no treino):
+              precision    recall  f1-score   support
+
+        HIGH       0.38      1.00      0.55        17
+         LOW       0.99      0.99      0.99        81
+      MEDIUM       0.98      0.60      0.74        72
+
+    accuracy                           0.82       170
+   macro avg       0.78      0.86      0.76       170
+weighted avg       0.92      0.82      0.84       170
+
+
+Salvando modelo final (RandomForest + smote) em: model.pkl
+Treinamento concluido.
