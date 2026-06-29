@@ -1,62 +1,52 @@
-export function classifySpo2(value) {
-  if (value === null || value === undefined) return { tone: "unknown", label: "Sem leitura" };
-  if (value < 90) return { tone: "critical", label: "Crítico" };
-  if (value < 95) return { tone: "warning", label: "Atenção" };
-  return { tone: "normal", label: "Normal" };
+export function formatTimestamp(timestamp) {
+  if (!timestamp) return '—';
+  return new Date(timestamp).toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 }
 
-export function classifyHeartRate(value) {
-  if (value === null || value === undefined || value === 0) {
-    return { tone: "unknown", label: "Sem leitura" };
-  }
-  if (value < 50 || value > 110) return { tone: "warning", label: "Atenção" };
-  return { tone: "normal", label: "Normal" };
+export function formatRelativeTime(date) {
+  if (!date) return '—';
+  const diffSeconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diffSeconds < 5)    return 'agora mesmo';
+  if (diffSeconds < 60)   return `há ${diffSeconds}s`;
+  if (diffSeconds < 3600) return `há ${Math.floor(diffSeconds / 60)}min`;
+  return `há ${Math.floor(diffSeconds / 3600)}h`;
 }
 
-export function classifyTemperature(value) {
-  if (value === null || value === undefined) return { tone: "unknown", label: "Sem leitura" };
-  if (value > 38.5) return { tone: "critical", label: "Febre alta" };
-  if (value > 37.5) return { tone: "warning", label: "Febre" };
-  return { tone: "normal", label: "Normal" };
+export function prepareChartData(series, dataKey, limit = 30, { skipFilled = false } = {}) {
+  if (!series?.length) return [];
+
+  return [...series]
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+    .slice(-limit)
+    .map((point, index) => ({
+      index,
+      value:    point[dataKey] ?? null,
+      ts:       point.timestamp,
+      // propaga a flag para que o filtro abaixo possa agir
+      _filled:  dataKey === 'riskScore' && !!point._riskScoreFilled,
+    }))
+    .filter((p) => p.value != null)
+    .filter((p) => !(skipFilled && p._filled));
 }
 
-const RISK_META = {
-  LOW: { label: "Baixo", tone: "low", order: 0 },
-  MEDIUM: { label: "Médio", tone: "medium", order: 1 },
-  HIGH: { label: "Alto", tone: "high", order: 2 },
-  CRITICAL: { label: "Crítico", tone: "critical", order: 3 }
-};
+export function computeStats(series, dataKey) {
+  const sorted = [...series]
+    .filter((p) => p[dataKey] != null)
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-export function riskMeta(level) {
-  return RISK_META[level] ?? { label: "Calculando Risco...", tone: "unknown", order: -1 };
-}
+  if (!sorted.length) return { min: null, max: null, avg: null, delta: null };
 
-export function formatClock(date) {
-  return date.toLocaleTimeString("pt-BR", { hour12: false });
-}
+  const values = sorted.map((p) => p[dataKey]);
+  const min    = Math.min(...values);
+  const max    = Math.max(...values);
+  const avg    = values.reduce((s, v) => s + v, 0) / values.length;
+  const delta  = values.length >= 2
+    ? values[values.length - 1] - values[values.length - 2]
+    : null;
 
-export function formatTimestamp(isoString) {
-  if (!isoString) return "—";
-  const date = new Date(isoString);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleTimeString("pt-BR", { hour12: false });
-}
-
-export function formatDateTime(isoString) {
-  if (!isoString) return "—";
-  const date = new Date(isoString);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("pt-BR", { hour12: false });
-}
-
-export function secondsSince(isoString) {
-  if (!isoString) return Infinity;
-  const date = new Date(isoString);
-  if (Number.isNaN(date.getTime())) return Infinity;
-  return (Date.now() - date.getTime()) / 1000;
-}
-
-export function formatNumber(value, digits = 0) {
-  if (value === null || value === undefined) return "--";
-  return value.toFixed(digits);
+  return { min, max, avg, delta };
 }
