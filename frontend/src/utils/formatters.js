@@ -7,6 +7,20 @@ export function formatTimestamp(timestamp) {
   });
 }
 
+export function formatDateTime(timestamp) {
+  if (!timestamp) return '—';
+  return new Date(timestamp)
+    .toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+    .replace(',', ' ·');
+}
+
 export function formatRelativeTime(date) {
   if (!date) return '—';
   const diffSeconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -18,16 +32,14 @@ export function formatRelativeTime(date) {
 
 export function prepareChartData(series, dataKey, limit = 30, { skipFilled = false } = {}) {
   if (!series?.length) return [];
-
   return [...series]
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
     .slice(-limit)
     .map((point, index) => ({
       index,
-      value:    point[dataKey] ?? null,
-      ts:       point.timestamp,
-      // propaga a flag para que o filtro abaixo possa agir
-      _filled:  dataKey === 'riskScore' && !!point._riskScoreFilled,
+      value:   point[dataKey] ?? null,
+      ts:      point.timestamp,
+      _filled: dataKey === 'riskScore' && !!point._riskScoreFilled,
     }))
     .filter((p) => p.value != null)
     .filter((p) => !(skipFilled && p._filled));
@@ -37,9 +49,7 @@ export function computeStats(series, dataKey) {
   const sorted = [...series]
     .filter((p) => p[dataKey] != null)
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
   if (!sorted.length) return { min: null, max: null, avg: null, delta: null };
-
   const values = sorted.map((p) => p[dataKey]);
   const min    = Math.min(...values);
   const max    = Math.max(...values);
@@ -47,6 +57,5 @@ export function computeStats(series, dataKey) {
   const delta  = values.length >= 2
     ? values[values.length - 1] - values[values.length - 2]
     : null;
-
   return { min, max, avg, delta };
 }
