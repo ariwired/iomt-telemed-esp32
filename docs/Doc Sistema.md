@@ -37,7 +37,7 @@ A arquitetura é dividida em cinco camadas independentes, cada uma em seu própr
 4. Antes de salvar a leitura, o sistema garante a existência do paciente na tabela `patients`.
 5. A leitura é persistida na tabela `vital_signs`, sem classificação de risco ainda.
 6. A cada 30 segundos, um job agendado agrupa as leituras recentes por paciente, calcula médias de SpO2, frequência cardíaca e temperatura, e envia esses valores para o ml-api via requisição HTTP POST em `/predict`.
-7. O ml-api carrega um modelo de Random Forest pré-treinado (scikit-learn) e retorna a classe de risco prevista (LOW, MEDIUM, HIGH ou CRITICAL) e o score de confiança da predição.
+7. O ml-api carrega um modelo de Random Forest pré-treinado (scikit-learn) e retorna a classe de risco prevista (LOW, MEDIUM ou HIGH) e o score de confiança da predição. 
 8. Caso a chamada ao ml-api falhe (timeout, indisponibilidade), o backend aciona um mecanismo de fallback local baseado em regras fixas (`PredictiveRiskService`), garantindo que o pipeline nunca trave por dependência de um serviço externo.
 9. O resultado é gravado na última leitura do paciente e exposto via endpoint REST `GET /api/dashboard/patient/{id}`.
 10. O frontend React consulta esse endpoint a cada 4 segundos (polling) e atualiza o dashboard com os sinais vitais, o nível de risco e o histórico recente.
@@ -121,7 +121,7 @@ Um ponto de destaque arquitetural é o tratamento de falhas na chamada ao servi�
 ## 6. Camada de Machine Learning
 
 ### 6.1 Modelo e features
-O modelo foi treinado sobre dados sintéticos cujos rótulos foram gerados a partir de regras clínicas simplificadas. Dessa forma, o objetivo principal do Random Forest nesta prova de conceito não é superar clinicamente os limiares utilizados, mas validar a integração de uma camada de aprendizado de máquina dentro da arquitetura IoMT proposta.
+O modelo foi treinado sobre sinais vitais reais extraídos do MIMIC-III [Link Kaggle](https://www.kaggle.com/datasets/asjad99/mimiciii) (subconjunto demo, público no Kaggle), cujos rótulos de risco foram gerados por uma versão simplificada do NEWS2 aplicada às mesmas três variáveis de entrada (SpO2, frequência cardíaca, temperatura). Dessa forma, o objetivo do Random Forest se trata de reconstruir a regra do NEWS2 simplificado a partir de sinais capturados por sensores de baixo custo, validando a integração de uma camada de aprendizado de máquina dentro da arquitetura IoMT proposta.
 
 Esse desenho reflete diretamente a literatura de escores de alerta precoce (Early Warning Scores, EWS) usados em ambientes hospitalares, nos quais múltiplos sinais vitais são combinados em uma pontuação de risco — mas, diferentemente dos EWS tradicionais (somas lineares fixas, como o NEWS — National Early Warning Score), o uso de um classificador treinado permite capturar interações não-lineares entre as variáveis.
 
@@ -133,8 +133,7 @@ Esses estudos sustentam teoricamente a escolha de Random Forest como abordagem p
 
 ### 6.3 Limitações do modelo atual
 
-- O modelo é treinado sobre dados sintéticos gerados artificialmente, não sobre dados clínicos reais. válido como prova de conceito da arquitetura, mas sem validade clínica para uso em pacientes reais.
-- Não há validação cruzada k-fold nem métricas de AUROC/AUPRC documentadas formalmente, apenas a acurácia simples sobre um split de teste.
+- O modelo é treinado sobre sinais vitais reais do MIMIC-III (12 pacientes / 904 amostras), mas o rótulo de risco é gerado por regra determinística (a NEWS2 simplificado) a partir das mesmas variáveis de entrada, não há desfecho clínico anotado por profissionais de saúde. Válido como prova de conceito da arquitetura, mas sem validade clínica para uso em pacientes reais.
 - O modelo não considera o histórico temporal do paciente (tendência de piora/melhora), avaliando apenas o estado pontual mais recente — uma limitação que a literatura de EWS contemporânea já identificou como relevante, já que modelos que incorporam séries temporais tendem a superar modelos que avaliam apenas snapshots.
 
 ---
@@ -194,13 +193,13 @@ Assim, neste trabalho, o conjunto ESP32 + MAX30102 deve ser interpretado como um
 
 Comparado aos frameworks acadêmicos mais sofisticados revisados acima (que envolvem bancos de grafo, camadas adicionais de "roof computing", criptografia ponta-a-ponta e modelos de deep learning), este projeto se posiciona como uma prova de conceito funcional e didática, que implementa o núcleo conceitual de uma arquitetura fog-cloud-ML para IoMT, mas conscientemente simplificada para viabilizar a montagem completa, da camada de hardware até o dashboard.
 
-As principais diferenças em relação ao estado da arte mais avançado incluem: ausência de criptografia/autenticação na comunicação MQTT (presente em frameworks de segurança como os descritos em (5) e (6)); uso de um banco relacional simples em vez de bancos orientados a grafo otimizados para dados de série temporal de saúde (4); e treinamento do modelo de ML sobre dados sintéticos, em vez de dados clínicos reais validados externamente, como nos estudos de NEWS vs. Random Forest revisados (2, 3, 7, 8). Essas diferenças representam oportunidades claras de trabalho futuro, não falhas do protótipo atual.
+As principais diferenças em relação ao estado da arte mais avançado incluem: ausência de criptografia/autenticação na comunicação MQTT (presente em frameworks de segurança como os descritos em (5) e (6)); uso de um banco relacional simples em vez de bancos orientados a grafo otimizados para dados de série temporal de saúde (4); e rotulagem de risco por regra determinística sobre dados reais do MIMIC-III, em vez de desfechos clínicos reais validados externamente, como nos estudos de NEWS vs. Random Forest revisados (2, 3, 7, 8).
 
 ---
 
 ## 10. Limitações e trabalhos futuros
 
-- Treinar o modelo de Random Forest com dados clínicos reais ou datasets públicos validados (ex. MIMIC-III/IV), em vez de dados sintéticos.
+- Substituir o rótulo determinístico (NEWS2 simplificado) por desfechos clínicos reais anotados (ex. mortalidade, admissão em UTI, tendências de piora) e expandir a base além do subconjunto demo do MIMIC-III para o dataset completo MIMIC-III/IV.
 - Incorporar histórico temporal do paciente na predição de risco (tendência de piora/melhora), em vez de avaliar apenas o estado pontual mais recente.
 - Adicionar autenticação e criptografia na comunicação MQTT.
 - Implementar notificação ativa para familiares e equipe médica.
