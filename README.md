@@ -16,7 +16,7 @@ Um sistema de Internet of Medical Things (IoMT) desenhado para a verificação d
 
 O projeto foi construído com foco na resiliência e baixa latência, dividindo a carga de processamento em diferentes camadas:
 
-1. **Hardware:** Microcontrolador ESP32 equipado com sensores MAX30102 e DS18B20. Possui lógica de *fallback* médico implementada em C++ para acionamento de alertas visuais (LEDs) imediatos em caso de sinais críticos, garantindo segurança mesmo em falhas de rede.
+1. **Hardware:** Microcontrolador DOIT ESP32 DevKit V1 equipado com sensores MAX30102 e DS18B20. Possui lógica de *fallback* médico implementada em C++ para acionamento de alertas visuais (LEDs) imediatos em caso de sinais críticos, garantindo segurança mesmo em falhas de rede.
 2. **Fog Computing:** Broker Eclipse Mosquitto orquestrando a mensageria MQTT (`hospital/fog/monitoramento`) para garantir uma ingestão de dados leve e assíncrona.
 3. **Back-End:** API em Java (Spring Boot) que consome os dados do MQTT, realiza a persistência num banco de dados PostgreSQL e gere tarefas agendadas.
 4. **Machine Learning:** Microsserviço Python (FastAPI) que aplica um modelo de *Random Forest* às amostras vitais, devolvendo um *Risk Score* e *Risk Level* atualizado.
