@@ -39,7 +39,7 @@ Para reproduzir:
 
 Para testar a lógica de calibração e estabilização térmica da camada de borda sem a necessidade do hardware físico, uma simulação do circuito de temperatura está disponível no Wokwi. O MAX30102 (SpO2/BPM) não tem suporte nativo no simulador Wokwi, então esta simulação cobre **apenas o DS18B20 e os LEDs de status**.
 
-🔗 **[Acessar Simulação ao Vivo no Wokwi](Chttps://wokwi.com/projects/473456253416728577)**
+🔗 **[Acessar Simulação ao Vivo no Wokwi](https://wokwi.com/projects/473456253416728577)**
 
 ### Como testar na simulação:
 1. Inicie a execução do simulador no navegador.
