@@ -1,54 +1,78 @@
 {
   "version": 1,
-  "author": "Prototipagem Fog Healthcare",
+  "author": "Prototipo IoMT - DS18B20 + LEDs",
   "editor": "wokwi",
   "parts": [
-    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-ds18b20", "id": "ds18b20", "top": 85.27, "left": 397.68, "attrs": {} },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_pullup",
+      "top": 196.8,
+      "left": 373.85,
+      "rotate": 90,
+      "attrs": { "value": "1000" }
+    },
     {
       "type": "wokwi-led",
       "id": "led_green",
-      "top": 102,
-      "left": -313,
+      "top": -90,
+      "left": 243.8,
       "attrs": { "color": "green" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_green",
+      "top": 42.35,
+      "left": 153.6,
+      "attrs": { "value": "100" }
     },
     {
       "type": "wokwi-led",
       "id": "led_yellow",
-      "top": 82.8,
-      "left": -284.2,
+      "top": -90,
+      "left": 359,
       "attrs": { "color": "yellow" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_yellow",
+      "top": 61.55,
+      "left": 201.6,
+      "attrs": { "value": "100" }
     },
     {
       "type": "wokwi-led",
       "id": "led_red",
-      "top": 73.2,
-      "left": -245.8,
+      "top": -138,
+      "left": 291.8,
       "attrs": { "color": "red" }
     },
-    { "type": "wokwi-ds18b20", "id": "temp", "top": -212.33, "left": 320.88, "attrs": {} },
     {
-      "type": "wokwi-potentiometer",
-      "id": "mock_spo2",
-      "top": -318.1,
-      "left": -201.8,
-      "attrs": {}
+      "type": "wokwi-resistor",
+      "id": "r_red",
+      "top": 3.95,
+      "left": 172.8,
+      "attrs": { "value": "100" }
     }
   ],
   "connections": [
-    [ "esp:TX", "$serialMonitor:RX", "", [] ],
-    [ "esp:RX", "$serialMonitor:TX", "", [] ],
-    [ "esp:GND.1", "led_green:C", "black", [] ],
-    [ "esp:GND.1", "led_yellow:C", "black", [] ],
-    [ "esp:GND.1", "led_red:C", "black", [] ],
-    [ "esp:25", "led_green:A", "green", [ "v0" ] ],
-    [ "esp:26", "led_yellow:A", "yellow", [ "v0" ] ],
-    [ "esp:27", "led_red:A", "red", [ "v0" ] ],
-    [ "esp:3V3", "temp:VCC", "red", [] ],
-    [ "esp:GND.2", "temp:GND", "black", [] ],
-    [ "esp:4", "temp:DQ", "green", [] ],
-    [ "esp:3V3", "mock_spo2:VCC", "red", [] ],
-    [ "esp:GND.2", "mock_spo2:GND", "black", [] ],
-    [ "esp:34", "mock_spo2:SIG", "cyan", [] ]
+    [ "esp:TX0", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX0", "$serialMonitor:TX", "", [] ],
+    [ "ds18b20:VCC", "esp:3V3", "red", [ "v115.2", "h-307.2", "v-76.8", "h-13.9" ] ],
+    [ "ds18b20:GND", "esp:GND.1", "black", [ "v19.2", "h-301.9" ] ],
+    [ "ds18b20:DQ", "esp:D4", "yellow", [ "v-9.6", "h-311.5" ] ],
+    [ "r_pullup:1", "esp:3V3", "red", [ "h-288", "v-14.3" ] ],
+    [ "r_pullup:2", "esp:D4", "gold", [ "h-240", "v-111.6" ] ],
+    [ "esp:D18", "r_green:1", "green", [] ],
+    [ "r_green:2", "led_green:A", "green", [ "h56.4", "v-96" ] ],
+    [ "led_green:C", "esp:GND.1", "black", [ "v192", "h-157.5" ] ],
+    [ "esp:D19", "r_yellow:1", "yellow", [] ],
+    [ "r_yellow:2", "led_yellow:A", "yellow", [] ],
+    [ "led_yellow:C", "esp:GND.1", "black", [ "v249.6", "h-272.7" ] ],
+    [ "esp:D23", "r_red:1", "red", [] ],
+    [ "r_red:2", "led_red:A", "red", [] ],
+    [ "led_red:C", "esp:GND.1", "black", [ "v9.6", "h-191.6", "v235.4" ] ]
   ],
   "dependencies": {}
 }

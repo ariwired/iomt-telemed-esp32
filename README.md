@@ -25,6 +25,7 @@ O projeto foi construído com foco na resiliência e baixa latência, dividindo 
 ---
 
 ## Dataset
+
 Este projeto usa o dataset "MIMIC-III - Deep Reinforcement Learning" do Kaggle:
 https://www.kaggle.com/datasets/asjad99/mimiciii
 
@@ -34,17 +35,19 @@ Para reproduzir:
 
 ---
 
-## Protótipo Interativo 
+## Protótipo Interativo
 
-Para testar a lógica da camada de borda (Edge) sem a necessidade do hardware físico, uma simulação exata do circuito está disponível no Wokwi. Como a plataforma web não simula nativamente sensores biomédicos, o sinal de oximetria é emulado via potenciômetro para validação dos filtros e alarmes.
+Para testar a lógica de calibração e estabilização térmica da camada de borda sem a necessidade do hardware físico, uma simulação do circuito de temperatura está disponível no Wokwi. O MAX30102 (SpO2/BPM) não tem suporte nativo no simulador Wokwi, então esta simulação cobre **apenas o DS18B20 e os LEDs de status**.
 
-🔗 **[Acessar Simulação ao Vivo no Wokwi](https://wokwi.com/projects/459458836238337025)**
+🔗 **[Acessar Simulação ao Vivo no Wokwi](Chttps://wokwi.com/projects/473456253416728577)**
 
 ### Como testar na simulação:
 1. Inicie a execução do simulador no navegador.
-2. Altere o slider do sensor de temperatura ou reduza o valor do potenciômetro de SpO2 para menos de 90%.
-3. Observe os **LEDs indicadores** mudando de estado e o **Buzzer** disparando o alarme sonoro instantaneamente.
-4. Abra o *Serial Monitor* para acompanhar as mensagens JSON sendo geradas e publicadas nos tópicos MQTT do nó Fog.
+2. Clique no sensor DS18B20 no diagrama para abrir o controle de temperatura simulada.
+3. Suba a temperatura acima de 37.5°C e depois 38.5°C (já considerando o offset de calibração +1.57°C aplicado no firmware) para ver os **LEDs indicadores** escalarem verde → amarelo → vermelho.
+4. Abra o *Serial Monitor* para acompanhar as leituras bruta/calibrada e o status de estabilização (`estabilizando...` / `ESTAVEL`) em tempo real.
+
+> Esta simulação não inclui WiFi, MQTT nem publicação de dados. É um teste isolado da lógica de calibração/estabilização do DS18B20 e do acionamento dos LEDs, desacoplado do SpO2. O fluxo completo roda no ESP32 físico.
 
 ---
 
