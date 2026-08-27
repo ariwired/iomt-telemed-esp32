@@ -178,6 +178,7 @@ void atualizarMAX30102() {
   Serial.print(" | SpO2: "); Serial.println(spo2Atual);
 }
 
+/*
 void atualizarLEDs() {
   digitalWrite(PIN_LED_GREEN, LOW);
   digitalWrite(PIN_LED_YELLOW, LOW);
@@ -193,6 +194,7 @@ void atualizarLEDs() {
     digitalWrite(PIN_LED_GREEN, HIGH);
   }
 }
+*/
 
 void setup() {
   Serial.begin(115200);
@@ -200,9 +202,9 @@ void setup() {
   Serial.println();
   Serial.println("TESTE DE INTEGRACAO: DS18B20 + MAX30102 + LEDs");
 
-  pinMode(PIN_LED_GREEN, OUTPUT);
-  pinMode(PIN_LED_YELLOW, OUTPUT);
-  pinMode(PIN_LED_RED, OUTPUT);
+  // pinMode(PIN_LED_GREEN, OUTPUT);
+  // pinMode(PIN_LED_YELLOW, OUTPUT);
+  // pinMode(PIN_LED_RED, OUTPUT);
 
   setupDS18B20();
   setupMAX30102();
@@ -214,5 +216,5 @@ void setup() {
 void loop() {
   atualizarDS18B20();
   atualizarMAX30102();
-  atualizarLEDs();
+  // atualizarLEDs();
 }
