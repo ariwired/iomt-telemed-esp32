@@ -27,7 +27,10 @@
 #define OFFSET_CALIBRACAO 1.57
 #define LIMIAR_ESTAVEL 0.10f
 #define AMOSTRAS_ESTAVEIS 5
-#define TEMP_CYCLE_MS 2000UL
+#define TEMP_CYCLE_MS 5000UL
+#define DEBUG_VERBOSE 0
+#define TELEPLOT_ENABLED 1
+#define TEMP_CONVERSION_MS 750UL
 
 OneWire oneWire(PIN_TEMP);
 DallasTemperature tempSensor(&oneWire);
@@ -48,6 +51,12 @@ uint32_t redBuffer[MEU_BUFFER_SIZE];
 int32_t spo2Atual = 0;
 int32_t bpmAtual = 0;
 bool leituraMaxValida = false;
+const char* fonteMaxAtual = "-";
+unsigned long lastValidMaxTime = 0;
+const unsigned long MAX_HOLD_TIMEOUT_MS = 8000UL;
+
+unsigned long lastStatusPrint = 0;
+const unsigned long STATUS_PRINT_MS = 5000;
 
 void setupDS18B20() {
   tempSensor.begin();
@@ -93,20 +102,13 @@ void atualizarDS18B20() {
     return;
   }
 
-  // ainda nao terminou -> nao bloqueia o loop, apenas retorna
-  if (!conversaoEmAndamento || !tempSensor.isConversionComplete()) return;
+  if (!conversaoEmAndamento || (agora - lastTempRequest < TEMP_CONVERSION_MS)) return;
 
   conversaoEmAndamento = false;
   float bruta = tempSensor.getTempCByIndex(0);
 
-  if (bruta == DEVICE_DISCONNECTED_C) {
-    Serial.println("[DS18B20] ERRO: sensor desconectado (-127). Confira a fiacao.");
-    contadorEstavel = 0;
-    tempEstabilizada = false;
-    return;
-  }
-  if (bruta == 85.0) {
-    Serial.println("[DS18B20] Leitura suspeita (85.0C). Sensor pode estar desconectado. Confira a fiacao.");
+  if (bruta == DEVICE_DISCONNECTED_C || bruta == 85.0) {
+    Serial.println("[DS18B20] ERRO ou leitura suspeita. Confira a fiacao.");
     contadorEstavel = 0;
     tempEstabilizada = false;
     return;
@@ -122,62 +124,85 @@ void atualizarDS18B20() {
   ultimaLeituraBruta = bruta;
   tempEstabilizada = (contadorEstavel >= AMOSTRAS_ESTAVEIS);
 
-  if (tempEstabilizada) {
-    tempCalibradaAtual = calibrada; // so alimenta os LEDs quando ja em equilibrio termico
-  }
+  tempCalibradaAtual = calibrada;
 
-  Serial.print("[DS18B20] Bruta: "); Serial.print(bruta, 2);
-  Serial.print(" C | Calibrada: "); Serial.print(calibrada, 2);
+  Serial.print("[DS18B20] Bruta: ");
+  Serial.print(bruta, 2);
+  Serial.print(" C | Calibrada (+");
+  Serial.print(OFFSET_CALIBRACAO);
+  Serial.print("): ");
+  Serial.print(calibrada, 2);
   Serial.print(" C | ");
-  Serial.println(tempEstabilizada ? "ESTAVEL" : "estabilizando...");
-}
 
-void preencherBufferMAX() {
-  for (int i = 0; i < MEU_BUFFER_SIZE; i++) {
-    while (particleSensor.available() == false) particleSensor.check();
-    redBuffer[i] = particleSensor.getFIFORed();
-    irBuffer[i]  = particleSensor.getFIFOIR();
-    particleSensor.nextSample();
+  if (tempEstabilizada) {
+    Serial.println("ESTAVEL - leitura valida");
+  } else {
+    Serial.print("estabilizando... (");
+    Serial.print(contadorEstavel);
+    Serial.print("/");
+    Serial.print(AMOSTRAS_ESTAVEIS);
+    Serial.println(")");
   }
 }
+
+int idxBufferMAX = 0;
 
 void atualizarMAX30102() {
-  preencherBufferMAX(); // ~1s por ciclo (100 amostras a 100Hz)
+  particleSensor.check();
 
-  int32_t spo2Padrao; int8_t validoSpo2Padrao;
-  int32_t bpmPadrao;  int8_t validoBpmPadrao;
-  maxim_heart_rate_and_oxygen_saturation(
-    irBuffer, MEU_BUFFER_SIZE, redBuffer,
-    &spo2Padrao, &validoSpo2Padrao, &bpmPadrao, &validoBpmPadrao
-  );
+  while (particleSensor.available()) {
+    redBuffer[idxBufferMAX] = particleSensor.getFIFORed();
+    irBuffer[idxBufferMAX]  = particleSensor.getFIFOIR();
+    particleSensor.nextSample();
+    idxBufferMAX++;
 
-  float spo2RF; int8_t validoSpo2RF;
-  int32_t bpmRF; int8_t validoBpmRF;
-  float ratioRF, correlRF;
-  rf_heart_rate_and_oxygen_saturation(
-    irBuffer, MEU_BUFFER_SIZE, redBuffer,
-    &spo2RF, &validoSpo2RF, &bpmRF, &validoBpmRF, &ratioRF, &correlRF
-  );
+    if (idxBufferMAX >= MEU_BUFFER_SIZE) {
+      int32_t spo2Padrao; int8_t validoSpo2Padrao;
+      int32_t bpmPadrao;  int8_t validoBpmPadrao;
+      maxim_heart_rate_and_oxygen_saturation(
+        irBuffer, MEU_BUFFER_SIZE, redBuffer,
+        &spo2Padrao, &validoSpo2Padrao, &bpmPadrao, &validoBpmPadrao
+      );
 
-  if (validoSpo2RF && validoBpmRF) {
-    spo2Atual = (int32_t)round(spo2RF);
-    bpmAtual = bpmRF;
-    leituraMaxValida = true;
-    Serial.print("[MAX30102] fonte=RF     ");
-  } else if (validoSpo2Padrao && validoBpmPadrao) {
-    spo2Atual = spo2Padrao;
-    bpmAtual = bpmPadrao;
-    leituraMaxValida = true;
-    Serial.print("[MAX30102] fonte=PADRAO (RF rejeitou) ");
-  } else {
-    leituraMaxValida = false;
-    Serial.print("[MAX30102] SEM leitura valida (RF e PADRAO rejeitaram) ");
+      float spo2RF; int8_t validoSpo2RF;
+      int32_t bpmRF; int8_t validoBpmRF;
+      float ratioRF, correlRF;
+      rf_heart_rate_and_oxygen_saturation(
+        irBuffer, MEU_BUFFER_SIZE, redBuffer,
+        &spo2RF, &validoSpo2RF, &bpmRF, &validoBpmRF, &ratioRF, &correlRF
+      );
+
+      if (validoSpo2RF && validoBpmRF) {
+        spo2Atual = (int32_t)round(spo2RF);
+        bpmAtual = bpmRF;
+        leituraMaxValida = true;
+        fonteMaxAtual = "RF";
+        lastValidMaxTime = millis();
+      } else if (validoSpo2Padrao && validoBpmPadrao) {
+        spo2Atual = spo2Padrao;
+        bpmAtual = bpmPadrao;
+        leituraMaxValida = true;
+        fonteMaxAtual = "PADRAO";
+        lastValidMaxTime = millis();
+      } else {
+        leituraMaxValida = false;
+        fonteMaxAtual = "SEM LEITURA";
+        if (millis() - lastValidMaxTime > MAX_HOLD_TIMEOUT_MS) {
+          spo2Atual = 0;
+          bpmAtual = 0;
+        }
+      }
+
+      #if DEBUG_VERBOSE
+        Serial.print("[MAX30102] fonte="); Serial.print(fonteMaxAtual);
+        Serial.print(" BPM: "); Serial.print(bpmAtual);
+        Serial.print(" | SpO2: "); Serial.println(spo2Atual);
+      #endif
+
+      idxBufferMAX = 0;
+    }
   }
-
-  Serial.print("BPM: "); Serial.print(bpmAtual);
-  Serial.print(" | SpO2: "); Serial.println(spo2Atual);
 }
-
 /*
 void atualizarLEDs() {
   digitalWrite(PIN_LED_GREEN, LOW);
@@ -195,6 +220,28 @@ void atualizarLEDs() {
   }
 }
 */
+
+void imprimirStatus() {
+  unsigned long agora = millis();
+  if (agora - lastStatusPrint < STATUS_PRINT_MS) return;
+  lastStatusPrint = agora;
+
+  float tempMostrar = isnan(tempCalibradaAtual) ? 0.0 : tempCalibradaAtual;
+
+  Serial.printf(
+    "[STATUS] t=%6lus | SpO2:%4ld%% | BPM:%4ld (%-11s) | Temp:%7.2fC (%s)\n",
+    agora / 1000,
+    spo2Atual, bpmAtual, fonteMaxAtual,
+    tempMostrar,
+    tempEstabilizada ? "ESTAVEL" : "estabilizando"
+  );
+
+#if TELEPLOT_ENABLED
+  Serial.print(">SpO2:"); Serial.println(spo2Atual);
+  Serial.print(">BPM:"); Serial.println(bpmAtual);
+  Serial.print(">Temp:"); Serial.println(tempMostrar);
+#endif
+}
 
 void setup() {
   Serial.begin(115200);
@@ -217,4 +264,5 @@ void loop() {
   atualizarDS18B20();
   atualizarMAX30102();
   // atualizarLEDs();
+  imprimirStatus();
 }
