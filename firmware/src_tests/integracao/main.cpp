@@ -51,10 +51,10 @@ bool leituraMaxValida = false;
 
 void setupDS18B20() {
   tempSensor.begin();
-  tempSensor.setWaitForConversion(false); 
+  tempSensor.setWaitForConversion(false);
 
   int qtd = tempSensor.getDeviceCount();
-  Serial.print("[DS18B20] Sensores encontrados: ");
+  Serial.print("DS18B20 encontrados no barramento: ");
   Serial.println(qtd);
   if (qtd == 0) {
     Serial.println("[DS18B20] ALERTA: nenhum sensor no barramento.");
