@@ -14,7 +14,9 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,15 +42,31 @@ public class VitalSignService {
     public VitalSign processAndSaveTelemetry(VitalSignPayloadDTO dto) {
         patientService.ensurePatientExists(dto.getPacienteId());
 
+        // O firmware envia 0 para SpO2/FC quando não há dedo no sensor, e o DS18B20
+        // devolve -127 quando desconectado. Esses valores não são medições: gravamos
+        // null para não distorcer gráficos, médias e a análise de risco.
         VitalSign entity = VitalSign.builder()
                 .pacienteId(dto.getPacienteId())
-                .spo2(dto.getSpo2())
-                .frequenciaCardiaca(dto.getFc())
-                .temperatura(dto.getTemp())
+                .spo2(withinRange(dto.getSpo2(), SPO2_MIN, SPO2_MAX))
+                .frequenciaCardiaca(withinRange(dto.getFc(), FC_MIN, FC_MAX))
+                .temperatura(withinRange(dto.getTemp(), TEMP_MIN, TEMP_MAX))
                 .source("MQTT_FOG")
                 .build();
 
         return vitalSignRepository.save(entity);
+    }
+
+    // Faixas fisiologicamente plausíveis (as mesmas aceitas pelo ml-api).
+    private static final int SPO2_MIN = 50, SPO2_MAX = 100;
+    private static final int FC_MIN = 20, FC_MAX = 250;
+    private static final double TEMP_MIN = 25.0, TEMP_MAX = 45.0;
+
+    private static Integer withinRange(Integer value, int min, int max) {
+        return value != null && value >= min && value <= max ? value : null;
+    }
+
+    private static Double withinRange(Double value, double min, double max) {
+        return value != null && value >= min && value <= max ? value : null;
     }
 
     @Scheduled(fixedRate = 30000) // 30s definido para a apresentação do projeto, idealmente era 15 min
@@ -70,9 +88,24 @@ public class VitalSignService {
             String pacienteId = entry.getKey();
             List<VitalSign> leiturasDoPaciente = entry.getValue();
 
-            int mediaSpo2 = (int) leiturasDoPaciente.stream().mapToInt(VitalSign::getSpo2).average().orElse(0);
-            int mediaFc = (int) leiturasDoPaciente.stream().mapToInt(VitalSign::getFrequenciaCardiaca).average().orElse(0);
-            double mediaTemp = leiturasDoPaciente.stream().mapToDouble(VitalSign::getTemperatura).average().orElse(0.0);
+            // Médias só com leituras válidas (null = sensor sem medição). Antes, os
+            // zeros de "sem dedo" entravam na média e derrubavam SpO2/FC, gerando
+            // risco falso; e um null causaria NullPointerException no unboxing.
+            OptionalDouble spo2 = leiturasDoPaciente.stream().map(VitalSign::getSpo2)
+                    .filter(Objects::nonNull).mapToInt(Integer::intValue).average();
+            OptionalDouble fc = leiturasDoPaciente.stream().map(VitalSign::getFrequenciaCardiaca)
+                    .filter(Objects::nonNull).mapToInt(Integer::intValue).average();
+            OptionalDouble temp = leiturasDoPaciente.stream().map(VitalSign::getTemperatura)
+                    .filter(Objects::nonNull).mapToDouble(Double::doubleValue).average();
+
+            if (spo2.isEmpty() || fc.isEmpty() || temp.isEmpty()) {
+                logger.info("   -> Paciente [{}] sem leituras válidas suficientes na janela; análise ignorada.", pacienteId);
+                continue;
+            }
+
+            int mediaSpo2 = (int) Math.round(spo2.getAsDouble());
+            int mediaFc = (int) Math.round(fc.getAsDouble());
+            double mediaTemp = temp.getAsDouble();
 
             logger.info("   -> Paciente [{}] -> Média SpO2: {}% | FC: {} | Temp: {}C", pacienteId, mediaSpo2, mediaFc, String.format("%.1f", mediaTemp));
 
