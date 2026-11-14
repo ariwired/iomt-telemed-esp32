@@ -28,6 +28,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
 
                         .requestMatchers("/api/dashboard/**").permitAll()
+                        // Sem isso, erros (ex.: 404 de paciente inexistente) são
+                        // encaminhados para /error e viram 403.
+                        .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()
                 );
 
