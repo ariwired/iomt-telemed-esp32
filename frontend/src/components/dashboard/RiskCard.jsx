@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 import { COLORS } from '../../theme';
-import { RISK_LEVELS } from '../../domain/vitals';
+import { RISK_LEVELS, RISK_SOURCES } from '../../domain/vitals';
 import { CHART_WINDOW, buildRiskSeries } from '../../domain/series';
 import { formatPercent, formatTime } from '../../utils/formatters';
 import { RiskChart } from '../charts/RiskChart';
@@ -37,16 +37,30 @@ function RiskCardComponent({ readings, latestRisk }) {
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2 text-label-md text-on-surface-variant">
-          {latestRisk ? <span>avaliado às {formatTime(latestRisk.t)}</span> : <span>aguardando análise</span>}
+          {latestRisk ? (
+            <>
+              <span>avaliado às {formatTime(latestRisk.t)}</span>
+              {RISK_SOURCES[latestRisk.source] && (
+                <span className="rounded-full bg-surface-container-high px-2 py-0.5 uppercase tracking-wide">
+                  {RISK_SOURCES[latestRisk.source].label}
+                </span>
+              )}
+            </>
+          ) : (
+            <span>aguardando análise</span>
+          )}
         </div>
       </header>
 
       <RiskChart series={series} />
 
       <StatRow>
-        <StatCell label="Avaliações" value={series.length} />
+        <StatCell label="Gravidade atual" value={formatPercent(latestRisk?.score)} />
+        <StatCell
+          label="Confiança do modelo"
+          value={latestRisk?.source === 'LOCAL_RULES' ? 'n/a' : formatPercent(latestRisk?.confidence)}
+        />
         <StatCell label="Pior nível" value={worst ? <RiskBadge riskLevel={worst.level} size="sm" /> : '—'} />
-        <StatCell label="Confiança" value={formatPercent(latestRisk?.score)} />
       </StatRow>
     </article>
   );

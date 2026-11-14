@@ -19,7 +19,7 @@ export function buildVitalSeries(readings, key, limit = Infinity) {
 
 /**
  * Série do nível de risco, só com as leituras que foram avaliadas.
- * @returns {{ t: number, rank: number, level: string, score: number|null }[]}
+ * @returns {{ t: number, rank: number, level: string, score: number|null, confidence: number|null, source: string|null }[]}
  */
 export function buildRiskSeries(readings, limit = Infinity) {
   const evaluated = readings.filter((r) => r.riskLevel);
@@ -29,6 +29,8 @@ export function buildRiskSeries(readings, limit = Infinity) {
     rank: RISK_LEVELS[r.riskLevel].rank,
     level: r.riskLevel,
     score: r.riskScore,
+    confidence: r.riskConfidence,
+    source: r.riskSource,
   }));
 }
 

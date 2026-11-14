@@ -69,13 +69,42 @@ describe('normalizeDashboard', () => {
     const result = normalizeDashboard({
       pacienteId: '1234',
       historicalSeries: [
-        reading(1, '2026-11-14T12:00:00Z', { riskScore: 0.9, riskLevel: 'LOW' }),
+        reading(1, '2026-11-14T12:00:00Z', {
+          riskScore: 0.1,
+          riskConfidence: 0.9,
+          riskLevel: 'LOW',
+          riskSource: 'ML_MODEL',
+        }),
         reading(2, '2026-11-14T12:00:05Z'),
       ],
     });
 
     expect(result.readings[1].riskLevel).toBeNull();
-    expect(result.latestRisk).toEqual({ level: 'LOW', score: 0.9, t: Date.parse('2026-11-14T12:00:00Z') });
+    expect(result.latestRisk).toEqual({
+      level: 'LOW',
+      score: 0.1,
+      confidence: 0.9,
+      source: 'ML_MODEL',
+      t: Date.parse('2026-11-14T12:00:00Z'),
+    });
+  });
+
+  it('separa gravidade e confiança; regras locais não têm confiança', () => {
+    const result = normalizeDashboard({
+      pacienteId: '1',
+      historicalSeries: [
+        reading(1, '2026-11-14T12:00:00Z', { riskScore: 0.6, riskLevel: 'HIGH', riskSource: 'LOCAL_RULES' }),
+      ],
+    });
+    expect(result.latest).toMatchObject({ riskScore: 0.6, riskConfidence: null, riskSource: 'LOCAL_RULES' });
+  });
+
+  it('descarta score de registro legado sem origem (era confiança, não gravidade)', () => {
+    const result = normalizeDashboard({
+      pacienteId: '1',
+      historicalSeries: [reading(1, '2026-11-14T12:00:00Z', { riskScore: 0.95, riskLevel: 'LOW' })],
+    });
+    expect(result.latest).toMatchObject({ riskLevel: 'LOW', riskScore: null, riskConfidence: null });
   });
 
   it('transforma leitura sem dedo em lacuna, não em zero', () => {

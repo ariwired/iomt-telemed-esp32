@@ -80,3 +80,10 @@ Este comando irá inicializar 5 containers:
 
 ### 3. Acesso
 Acesse ao Dashboard em: http://localhost
+
+### Avaliação de risco
+A cada 30 s o backend avalia a média das leituras válidas de cada paciente e grava na última leitura:
+- `riskLevel`: nível previsto (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`);
+- `riskScore`: **gravidade** em [0, 1], a média dos pesos dos níveis (0, ⅓, ⅔, 1) ponderada pelas probabilidades do modelo;
+- `riskConfidence`: **confiança** do modelo no nível previsto (probabilidade da classe). Fica nulo quando quem avaliou foram as regras locais;
+- `riskSource`: `ML_MODEL` ou `LOCAL_RULES` (fallback quando o ml-api está indisponível).

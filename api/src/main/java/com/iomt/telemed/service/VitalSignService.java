@@ -119,7 +119,9 @@ public class VitalSignService {
 
             VitalSign ultimaLeituraReal = leiturasDoPaciente.get(leiturasDoPaciente.size() - 1);
             ultimaLeituraReal.setRiskScore(analise.score());
+            ultimaLeituraReal.setRiskConfidence(analise.confidence());
             ultimaLeituraReal.setRiskLevel(analise.level());
+            ultimaLeituraReal.setRiskSource(analise.source());
 
             vitalSignRepository.save(ultimaLeituraReal);
 
@@ -141,7 +143,12 @@ public class VitalSignService {
             try {
                 MlPredictionResponseDTO prediction = mlResponse.get();
                 VitalSign.RiskLevel level = PredictiveRiskService.parseLevel(prediction.getLevel());
-                return new PredictiveRiskService.RiskAnalysis(prediction.getScore(), level);
+                Double score = prediction.getRiskScore();
+                if (score == null || score < 0 || score > 1) {
+                    throw new IllegalArgumentException("risk_score ausente ou fora de [0, 1]: " + score);
+                }
+                return new PredictiveRiskService.RiskAnalysis(
+                        score, prediction.getConfidence(), level, VitalSign.RiskSource.ML_MODEL);
             } catch (Exception e) {
                 logger.warn("Resposta do ml-api em formato inesperado, usando fallback local. Causa: {}", e.getMessage());
             }

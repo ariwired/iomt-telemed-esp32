@@ -1,4 +1,4 @@
-import { RISK_LEVELS, VITALS } from './vitals';
+import { RISK_LEVELS, RISK_SOURCES, VITALS } from './vitals';
 
 /**
  * Leitura normalizada usada por toda a interface.
@@ -8,8 +8,10 @@ import { RISK_LEVELS, VITALS } from './vitals';
  * @property {number|null} spo2
  * @property {number|null} frequenciaCardiaca
  * @property {number|null} temperatura
- * @property {number|null} riskScore        Só presente nas leituras avaliadas pelo modelo.
- * @property {keyof RISK_LEVELS|null} riskLevel
+ * @property {keyof RISK_LEVELS|null} riskLevel  Só presente nas leituras avaliadas.
+ * @property {number|null} riskScore        Gravidade em [0, 1] (0 = baixo, 1 = crítico).
+ * @property {number|null} riskConfidence   Confiança do modelo no nível previsto, em [0, 1].
+ * @property {keyof RISK_SOURCES|null} riskSource  Quem avaliou: modelo ou regras locais.
  * @property {string|null} source
  */
 
@@ -20,7 +22,7 @@ import { RISK_LEVELS, VITALS } from './vitals';
  * @property {string|null} nome
  * @property {Reading[]} readings           Ordem cronológica crescente, sem duplicatas.
  * @property {Reading|null} latest
- * @property {{ level: string, score: number|null, t: number } | null} latestRisk
+ * @property {{ level: string, score: number|null, confidence: number|null, source: string|null, t: number } | null} latestRisk
  * @property {string} signature             Muda somente quando o conteúdo muda.
  */
 
@@ -65,8 +67,13 @@ function sanitizeRiskLevel(level) {
   return key in RISK_LEVELS ? key : null;
 }
 
-function sanitizeScore(score) {
-  return typeof score === 'number' && Number.isFinite(score) ? score : null;
+/** Proporção em [0, 1]; qualquer outra coisa vira null. */
+function sanitizeFraction(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1 ? value : null;
+}
+
+function sanitizeRiskSource(source) {
+  return typeof source === 'string' && source in RISK_SOURCES ? source : null;
 }
 
 function normalizeReading(raw) {
@@ -78,8 +85,10 @@ function normalizeReading(raw) {
   const reading = {
     id: raw.id != null ? String(raw.id) : `t${t}`,
     t,
-    riskScore: null,
     riskLevel: null,
+    riskScore: null,
+    riskConfidence: null,
+    riskSource: null,
     source: raw.source ?? null,
   };
 
@@ -87,12 +96,19 @@ function normalizeReading(raw) {
     reading[vital.key] = sanitizeVital(raw[vital.key], vital.validRange);
   }
 
-  // O backend só grava risco em uma leitura por janela de análise. O nível é a
-  // informação confiável; o score sozinho não basta para considerar a avaliação.
+  // O backend só grava risco em uma leitura por janela de análise; o nível é o
+  // que marca a leitura como avaliada.
   const level = sanitizeRiskLevel(raw.riskLevel);
   if (level) {
     reading.riskLevel = level;
-    reading.riskScore = sanitizeScore(raw.riskScore);
+    reading.riskSource = sanitizeRiskSource(raw.riskSource);
+    // Registros gravados antes de existir `riskSource` guardavam a confiança do
+    // modelo em `riskScore`. Sem a origem não dá para saber o que o número é,
+    // então ele é descartado em vez de exibido como gravidade.
+    if (reading.riskSource) {
+      reading.riskScore = sanitizeFraction(raw.riskScore);
+      reading.riskConfidence = sanitizeFraction(raw.riskConfidence);
+    }
   }
 
   return reading;
@@ -137,7 +153,13 @@ export function normalizeDashboard(raw) {
   for (let i = readings.length - 1; i >= 0; i--) {
     const r = readings[i];
     if (r.riskLevel) {
-      latestRisk = { level: r.riskLevel, score: r.riskScore, t: r.t };
+      latestRisk = {
+        level: r.riskLevel,
+        score: r.riskScore,
+        confidence: r.riskConfidence,
+        source: r.riskSource,
+        t: r.t,
+      };
       break;
     }
   }

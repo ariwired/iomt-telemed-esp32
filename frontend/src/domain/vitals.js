@@ -94,6 +94,12 @@ export const RISK_LEVELS = {
 
 export const RISK_LEVEL_ORDER = Object.keys(RISK_LEVELS);
 
+/** Origem da avaliação de risco (`riskSource` no backend). */
+export const RISK_SOURCES = {
+  ML_MODEL: { label: 'Modelo de IA', short: 'IA' },
+  LOCAL_RULES: { label: 'Regras locais (fallback)', short: 'Regras' },
+};
+
 export function riskLevelFromRank(rank) {
   return RISK_LEVEL_ORDER.find((k) => RISK_LEVELS[k].rank === rank) ?? null;
 }

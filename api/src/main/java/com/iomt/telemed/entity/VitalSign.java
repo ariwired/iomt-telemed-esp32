@@ -46,12 +46,22 @@ public class VitalSign {
     @Column(name = "temperatura")
     private Double temperatura;
 
+    /** Gravidade do risco em [0, 1] (0 = baixo, 1 = crítico). */
     @Column(name = "risk_score")
     private Double riskScore;
+
+    /** Confiança do modelo no nível previsto, em [0, 1]. Null quando avaliado por regras. */
+    @Column(name = "risk_confidence")
+    private Double riskConfidence;
 
     @Column(name = "risk_level", length = 16)
     @Enumerated(EnumType.STRING)
     private RiskLevel riskLevel;
+
+    /** Quem avaliou o risco: modelo de ML ou regras locais de fallback. */
+    @Column(name = "risk_source", length = 16)
+    @Enumerated(EnumType.STRING)
+    private RiskSource riskSource;
 
     @Column(name = "source", length = 32)
     @Builder.Default
@@ -63,5 +73,9 @@ public class VitalSign {
 
     public enum RiskLevel {
         LOW, MEDIUM, HIGH, CRITICAL
+    }
+
+    public enum RiskSource {
+        ML_MODEL, LOCAL_RULES
     }
 }
