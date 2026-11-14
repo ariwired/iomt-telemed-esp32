@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { STATUS_META, VITALS, formatVital } from '../../domain/vitals';
+import { RISK_SOURCES, STATUS_META, VITALS, formatVital } from '../../domain/vitals';
 import { formatDateTime, formatPercent } from '../../utils/formatters';
 import { Icon } from '../ui/Icon';
 import { RiskBadge } from '../ui/RiskBadge';
@@ -74,8 +74,14 @@ export function ReadingsTable({ readings }) {
               <th scope="col" className={`${TH} text-left`}>
                 Risco (IA)
               </th>
-              <th scope="col" className={`${TH} text-right`} title="Confiança do modelo na classe prevista">
+              <th scope="col" className={`${TH} text-right`} title="Gravidade do risco: 0% = baixo, 100% = crítico">
+                Gravidade
+              </th>
+              <th scope="col" className={`${TH} text-right`} title="Confiança do modelo no nível previsto">
                 Confiança
+              </th>
+              <th scope="col" className={`${TH} text-left`}>
+                Avaliado por
               </th>
               <th scope="col" className={`${TH} text-left`}>
                 Fonte
@@ -110,7 +116,13 @@ export function ReadingsTable({ readings }) {
                   )}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-on-surface-variant">
-                  {row.riskLevel ? formatPercent(row.riskScore) : <Missing />}
+                  {row.riskScore != null ? formatPercent(row.riskScore) : <Missing />}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-on-surface-variant">
+                  {row.riskConfidence != null ? formatPercent(row.riskConfidence) : <Missing />}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-label-md text-on-surface-variant">
+                  {RISK_SOURCES[row.riskSource]?.short ?? <Missing />}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3">
                   <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-label-md uppercase tracking-wide text-on-surface-variant">

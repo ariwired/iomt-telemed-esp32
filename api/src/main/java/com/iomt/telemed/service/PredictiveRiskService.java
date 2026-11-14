@@ -37,10 +37,16 @@ public class PredictiveRiskService {
             level = VitalSign.RiskLevel.LOW;
         }
 
-        return new RiskAnalysis(score, level);
+        // Regras determinísticas: não há confiança probabilística a informar.
+        return new RiskAnalysis(score, null, level, VitalSign.RiskSource.LOCAL_RULES);
     }
 
-    public record RiskAnalysis(Double score, VitalSign.RiskLevel level) {}
+    /**
+     * @param score      gravidade em [0, 1]
+     * @param confidence confiança do modelo na classe prevista, ou null quando não se aplica
+     */
+    public record RiskAnalysis(Double score, Double confidence, VitalSign.RiskLevel level,
+                               VitalSign.RiskSource source) {}
 
     public static VitalSign.RiskLevel parseLevel(String level) {
         return VitalSign.RiskLevel.valueOf(level.trim().toUpperCase());

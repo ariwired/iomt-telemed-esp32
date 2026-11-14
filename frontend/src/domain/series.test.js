@@ -48,7 +48,7 @@ describe('computeYDomain', () => {
 describe('buildVitalSeries / buildRiskSeries', () => {
   const readings = [
     { t: 1, spo2: 97, riskLevel: null, riskScore: null },
-    { t: 2, spo2: null, riskLevel: 'MEDIUM', riskScore: 0.8 },
+    { t: 2, spo2: null, riskLevel: 'MEDIUM', riskScore: 0.4, riskConfidence: 0.8, riskSource: 'ML_MODEL' },
     { t: 3, spo2: 95, riskLevel: null, riskScore: null },
   ];
 
@@ -65,7 +65,9 @@ describe('buildVitalSeries / buildRiskSeries', () => {
   });
 
   it('série de risco só contém leituras avaliadas', () => {
-    expect(buildRiskSeries(readings)).toEqual([{ t: 2, rank: 1, level: 'MEDIUM', score: 0.8 }]);
+    expect(buildRiskSeries(readings)).toEqual([
+      { t: 2, rank: 1, level: 'MEDIUM', score: 0.4, confidence: 0.8, source: 'ML_MODEL' },
+    ]);
   });
 });
 

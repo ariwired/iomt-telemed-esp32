@@ -9,19 +9,15 @@ import {
   YAxis,
 } from 'recharts';
 import { COLORS } from '../../theme';
-import { RISK_LEVELS, riskLevelFromRank } from '../../domain/vitals';
+import { RISK_LEVELS, RISK_LEVEL_ORDER, RISK_SOURCES } from '../../domain/vitals';
 import { computeTimeDomain } from '../../domain/series';
+import { formatPercent } from '../../utils/formatters';
 import { ChartEmpty } from './ChartEmpty';
 import { ChartTooltip } from './ChartTooltip';
 import { AXIS_TICK, CHART_MARGIN, GRID_PROPS, TIME_AXIS_PROPS } from './chartTheme';
 
-const RANKS = Object.values(RISK_LEVELS).map((l) => l.rank);
-const Y_DOMAIN = [Math.min(...RANKS), Math.max(...RANKS)];
-
-function rankLabel(rank) {
-  const key = riskLevelFromRank(rank);
-  return key ? RISK_LEVELS[key].label : '';
-}
+const Y_TICKS = [0, 0.25, 0.5, 0.75, 1];
+const MAX_RANK = RISK_LEVELS[RISK_LEVEL_ORDER.at(-1)].rank;
 
 function RiskDot({ cx, cy, payload, r = 3 }) {
   if (cx == null || cy == null || !payload) return null;
@@ -29,17 +25,31 @@ function RiskDot({ cx, cy, payload, r = 3 }) {
   return <circle cx={cx} cy={cy} r={r} fill={color} />;
 }
 
-function tooltipText(point) {
-  const label = RISK_LEVELS[point.level]?.label ?? '—';
-  return `Risco ${label.toLowerCase()}`;
+function TooltipContent({ point }) {
+  const level = RISK_LEVELS[point.level]?.label ?? '—';
+  const source = RISK_SOURCES[point.source];
+  return (
+    <>
+      <div>Risco {level.toLowerCase()}</div>
+      <div className="font-normal text-on-surface-variant">
+        Gravidade {formatPercent(point.score)}
+        {point.confidence != null && ` · confiança ${formatPercent(point.confidence)}`}
+      </div>
+      {source && <div className="font-normal text-outline">{source.label}</div>}
+    </>
+  );
 }
 
 /**
- * Evolução do nível de risco. O eixo Y é ordinal (Baixo → Crítico) porque o
- * `riskScore` do modelo é a confiança na classe prevista, não a intensidade do
- * risco: um "Baixo" com 95% de confiança não é mais grave que um "Alto" com 60%.
+ * Evolução da gravidade do risco (0% = baixo, 100% = crítico). Cada ponto é
+ * colorido pelo nível previsto. Avaliações antigas sem gravidade conhecida são
+ * posicionadas pelo nível.
  */
 function RiskChartComponent({ series, height = 160 }) {
+  const data = useMemo(
+    () => series.map((p) => ({ ...p, value: p.score ?? p.rank / MAX_RANK })),
+    [series],
+  );
   const xDomain = useMemo(() => computeTimeDomain(series), [series]);
 
   if (!series.length) {
@@ -48,29 +58,28 @@ function RiskChartComponent({ series, height = 160 }) {
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={series} margin={CHART_MARGIN}>
+      <LineChart data={data} margin={CHART_MARGIN}>
         <CartesianGrid {...GRID_PROPS} />
         <XAxis {...TIME_AXIS_PROPS} domain={xDomain} />
         <YAxis
-          dataKey="rank"
           type="number"
-          domain={Y_DOMAIN}
-          ticks={RANKS}
+          domain={[0, 1]}
+          ticks={Y_TICKS}
           interval={0}
-          tickFormatter={rankLabel}
+          tickFormatter={formatPercent}
           tick={AXIS_TICK}
           tickLine={false}
           axisLine={false}
-          width={52}
+          width={40}
         />
         <Tooltip
-          content={<ChartTooltip render={tooltipText} />}
+          content={<ChartTooltip render={(point) => <TooltipContent point={point} />} />}
           cursor={{ stroke: COLORS.risk, strokeWidth: 1, strokeDasharray: '4 2', opacity: 0.5 }}
           isAnimationActive={false}
         />
         <Line
-          type="stepAfter"
-          dataKey="rank"
+          type="linear"
+          dataKey="value"
           stroke={COLORS.risk}
           strokeOpacity={0.6}
           strokeWidth={2}

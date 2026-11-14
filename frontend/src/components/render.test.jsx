@@ -13,7 +13,9 @@ function makeRaw() {
     spo2: i === 7 ? 0 : 96 + (i % 3),
     frequenciaCardiaca: i === 7 ? 0 : 70 + (i % 5),
     temperatura: 36.5 + (i % 4) / 10,
-    riskScore: i % 6 === 0 ? 0.8 : null,
+    riskScore: i % 6 === 0 ? 0.5 : null,
+    riskConfidence: i % 6 === 0 ? 0.8 : null,
+    riskSource: i % 6 === 0 ? 'ML_MODEL' : null,
     riskLevel: i % 6 === 0 ? ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'][i % 4] : null,
     source: 'MQTT_FOG',
     // Interrupção de 2 minutos entre as leituras 14 e 15
