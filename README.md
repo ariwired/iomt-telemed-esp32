@@ -24,6 +24,20 @@ O projeto foi construído com foco na resiliência e baixa latência, dividindo 
 
 ---
 
+## Screenshots
+
+### Monitoramento
+Sinais vitais em tempo real (SpO₂, frequência cardíaca e temperatura), com faixa de referência, mínimo, média e máximo, além do risco clínico avaliado pelo modelo de IA.
+
+![Tela de monitoramento do paciente](docs/images/screenshots/tela-monitoramento.png)
+
+### Histórico
+Leituras do paciente da mais recente para a mais antiga, com o nível de risco, a gravidade, a confiança do modelo e quem fez a avaliação.
+
+![Tela de histórico de leituras](docs/images/screenshots/tela-historico.png)
+
+---
+
 ## Dataset
 
 Este projeto usa o dataset "MIMIC-III - Deep Reinforcement Learning" do Kaggle:
