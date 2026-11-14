@@ -1,13 +1,15 @@
 {
   "name": "iomt-telemed-frontend",
   "version": "1.0.0",
-  "description": "Dashboard de monitoramento remoto de sinais vitais (IoMT) - consome a API Spring Boot",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
@@ -17,7 +19,14 @@
     "tailwindcss": "^4.3.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.17.0",
     "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.4.1"
-  }
+    "eslint": "^9.17.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.16",
+    "globals": "^15.14.0",
+    "vite": "^5.4.1",
+    "vitest": "^2.1.9"
+  },
+  "description": "Dashboard de monitoramento remoto de sinais vitais (IoMT) - consome a API Spring Boot"
 }

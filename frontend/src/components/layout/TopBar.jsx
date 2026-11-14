@@ -1,113 +1,59 @@
-import React from "react";
-
-import { formatRelativeTime } from "../../utils/formatters";
-import { StatusDot } from "../ui/StatusDot";
-import { PatientSearchForm } from "../dashboard/PatientSearchForm";
+import { useNow } from '../../hooks/useNow';
+import { formatRelativeTime } from '../../utils/formatters';
+import { PatientSearchForm } from '../dashboard/PatientSearchForm';
+import { Icon } from '../ui/Icon';
+import { StatusDot } from '../ui/StatusDot';
 
 const STATUS_LABELS = {
-  idle: "Aguardando",
-  loading: "Sincronizando",
-  online: "Online",
-  offline: "Offline",
+  idle: 'Aguardando',
+  loading: 'Sincronizando',
+  online: 'Online',
+  offline: 'Offline',
 };
 
-export function TopBar({
-  status,
-  lastSuccessAt,
-  onRefetch,
-  patientId,
-  onPatientSearch,
-}) {
+export function TopBar({ title, status, lastSuccessAt, onRefetch, patientId, onPatientSearch }) {
+  const now = useNow();
+
   return (
-    <header className="flex justify-between items-center w-full px-6 md:px-10 py-4 bg-surface sticky top-0 z-10 border-b border-surface-variant">
-
-      {/* Título */}
-
-      <div className="flex items-center gap-5">
-
-        <span className="text-headline-md font-bold text-on-surface tracking-tight">
-          Monitoramento
-        </span>
-
-        <div className="hidden lg:block">
-          <PatientSearchForm
-            currentId={patientId}
-            onSearch={onPatientSearch}
-            status={status}
-          />
-        </div>
-
+    <header className="sticky top-0 z-10 flex w-full flex-wrap items-center justify-between gap-3 border-b border-surface-variant bg-surface px-4 py-4 md:px-10">
+      <div className="flex min-w-0 flex-1 items-center gap-5">
+        <span className="hidden text-headline-md font-bold tracking-tight text-on-surface sm:inline">{title}</span>
+        <PatientSearchForm
+          key={patientId ?? ''}
+          currentId={patientId}
+          onSearch={onPatientSearch}
+          disabled={status === 'loading' && !lastSuccessAt}
+        />
       </div>
 
-      {/* Área direita */}
-
-      <div className="flex items-center gap-4">
-
-        {/* Status */}
-
-        <div className="flex items-center gap-2 bg-surface-container-high px-3 py-1.5 rounded-full">
-
+      <div className="flex items-center gap-3">
+        <div
+          className="flex items-center gap-2 rounded-full bg-surface-container-high px-3 py-1.5"
+          role="status"
+          aria-live="polite"
+        >
           <StatusDot status={status} />
-
-          <span className="text-label-md text-on-surface uppercase tracking-widest">
+          <span className="text-label-md uppercase tracking-widest text-on-surface">
             {STATUS_LABELS[status] ?? status}
           </span>
-
           {lastSuccessAt && (
-            <span className="hidden sm:inline text-label-md text-on-surface-variant">
-              · {formatRelativeTime(lastSuccessAt)}
+            <span className="hidden text-label-md text-on-surface-variant sm:inline">
+              · {formatRelativeTime(lastSuccessAt, now)}
             </span>
           )}
-
         </div>
 
-        {/* Botões */}
-
-        <div className="flex gap-1">
-
-          <button
-            onClick={onRefetch}
-            title="Atualizar"
-            className="
-              p-2
-              rounded-lg
-              text-on-surface-variant
-              hover:text-primary
-              hover:bg-surface-container-high
-              transition-colors
-            "
-          >
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: 22 }}
-            >
-              refresh
-            </span>
-          </button>
-
-          <button
-            title="Notificações"
-            className="
-              p-2
-              rounded-lg
-              text-on-surface-variant
-              hover:text-primary
-              hover:bg-surface-container-high
-              transition-colors
-            "
-          >
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: 22 }}
-            >
-              notifications
-            </span>
-          </button>
-
-        </div>
-
+        <button
+          type="button"
+          onClick={onRefetch}
+          disabled={!patientId}
+          title="Atualizar agora"
+          aria-label="Atualizar agora"
+          className="rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-primary disabled:opacity-35"
+        >
+          <Icon name="refresh" size={22} />
+        </button>
       </div>
-
     </header>
   );
 }

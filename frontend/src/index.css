@@ -39,6 +39,21 @@
   --color-on-error: #690005;
   --color-on-error-container: #ffdad6;
 
+  /* Estados clínicos (espelhados em src/theme.js para o Recharts) */
+  --color-warning: #ffd080;
+  --color-risk-high: #ffb347;
+  --color-risk-low-container: #003823;
+  --color-risk-medium-container: #3d3200;
+  --color-risk-high-container: #3d1a00;
+
+  /* ── Animations ──────────────────────────────────────────────────── */
+  --animate-fade-in: fade-in 0.18s ease;
+
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(-2px); }
+    to { opacity: 1; transform: none; }
+  }
+
   /* ── Typography ──────────────────────────────────────────────────── */
   --font-sans: "Inter", sans-serif;
 

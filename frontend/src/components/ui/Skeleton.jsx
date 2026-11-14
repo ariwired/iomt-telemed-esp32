@@ -1,36 +1,29 @@
-import React from 'react';
-
 function Bone({ className = '', style }) {
-  return (
-    <div
-      className={`bg-surface-container-high rounded-lg animate-pulse ${className}`}
-      style={style}
-    />
-  );
+  return <div className={`animate-pulse rounded-lg bg-surface-container-high ${className}`} style={style} />;
 }
 
 export function VitalCardSkeleton() {
   return (
-    <div className="bg-surface-container rounded-xl p-6 flex flex-col gap-5 border border-transparent">
+    <div className="flex flex-col gap-5 rounded-xl border border-transparent bg-surface-container p-6">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <Bone className="w-10 h-10 rounded-lg flex-shrink-0" />
+          <Bone className="h-10 w-10 shrink-0" />
           <div className="flex flex-col gap-2">
-            <Bone className="w-24 h-3 rounded" />
-            <Bone className="w-16 h-7 rounded" />
+            <Bone className="h-3 w-24 rounded" />
+            <Bone className="h-7 w-16 rounded" />
           </div>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <Bone className="w-20 h-4 rounded-full" />
-          <Bone className="w-14 h-4 rounded" />
+          <Bone className="h-4 w-20 rounded-full" />
+          <Bone className="h-4 w-14 rounded" />
         </div>
       </div>
-      <Bone className="w-full rounded-lg" style={{ height: 160 }} />
-      <div className="flex items-center justify-between pt-3 border-t border-surface-variant">
+      <Bone className="w-full" style={{ height: 160 }} />
+      <div className="flex items-center justify-between border-t border-surface-variant pt-3">
         {[0, 1, 2].map((i) => (
           <div key={i} className="flex flex-col gap-1.5">
-            <Bone className="w-8 h-3 rounded" />
-            <Bone className="w-14 h-4 rounded" />
+            <Bone className="h-3 w-8 rounded" />
+            <Bone className="h-4 w-14 rounded" />
           </div>
         ))}
       </div>
@@ -40,21 +33,21 @@ export function VitalCardSkeleton() {
 
 export function PatientHeaderSkeleton() {
   return (
-    <div className="bg-surface-container rounded-xl p-6 flex flex-col gap-5 border border-surface-variant animate-pulse">
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+    <div className="flex flex-col gap-5 rounded-xl border border-surface-variant bg-surface-container p-6">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div className="flex flex-col gap-2">
-          <Bone className="w-56 h-7 rounded" />
-          <Bone className="w-80 h-4 rounded" />
+          <Bone className="h-7 w-56 rounded" />
+          <Bone className="h-4 w-80 max-w-full rounded" />
         </div>
-        <Bone className="w-36 h-10 rounded-full" />
+        <Bone className="h-10 w-36 rounded-full" />
       </div>
       <div className="border-t border-surface-variant" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
           <div key={i} className="flex flex-col gap-2">
-            <Bone className="w-24 h-3 rounded" />
-            <Bone className="w-16 h-6 rounded" />
-            <Bone className="w-12 h-3 rounded" />
+            <Bone className="h-3 w-24 rounded" />
+            <Bone className="h-6 w-16 rounded" />
+            <Bone className="h-3 w-12 rounded" />
           </div>
         ))}
       </div>
@@ -62,18 +55,13 @@ export function PatientHeaderSkeleton() {
   );
 }
 
-export function TableSkeleton() {
+export function TableSkeleton({ rows = 10 }) {
   return (
-    <div className="rounded-xl border border-surface-variant overflow-hidden">
-      {/* Header */}
+    <div className="overflow-hidden rounded-xl border border-surface-variant">
       <Bone className="w-full rounded-none" style={{ height: 44 }} />
-      {/* Rows */}
-      {Array.from({ length: 10 }).map((_, i) => (
+      {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="border-t border-surface-variant">
-          <Bone
-            className="w-full rounded-none"
-            style={{ height: 48, opacity: Math.max(0.15, 1 - i * 0.08) }}
-          />
+          <Bone className="w-full rounded-none" style={{ height: 48, opacity: Math.max(0.15, 1 - i * 0.08) }} />
         </div>
       ))}
     </div>
