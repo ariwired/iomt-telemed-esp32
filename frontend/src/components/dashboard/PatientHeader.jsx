@@ -1,150 +1,121 @@
-import React from 'react';
-import { RiskBadge }            from '../ui/RiskBadge';
-import { PatientHeaderSkeleton } from '../ui/Skeleton';
-import { StatusDot }             from '../ui/StatusDot';
-import { formatTimestamp, formatRelativeTime } from '../../utils/formatters';
-import { VITALS_CONFIG, STATUS_META, RISK_LEVEL_META } from '../../constants/vitals';
+import { COLORS } from '../../theme';
+import { RISK_LEVELS, STATUS_META, VITALS, formatVital } from '../../domain/vitals';
+import { formatRelativeTime, formatTime } from '../../utils/formatters';
+import { useNow } from '../../hooks/useNow';
+import { Dot } from '../ui/Dot';
+import { Icon } from '../ui/Icon';
+import { RiskBadge } from '../ui/RiskBadge';
+import { StatusDot } from '../ui/StatusDot';
 
-// ─── Mini-stat de vital (dentro do card de resumo) ───────────────────────────
-
-function VitalMiniStat({ config, value }) {
-  const status = config.getStatus(value);
-  const meta   = STATUS_META[status];
-
-  // Evita repetir unidade se a função format já a inclui (ex: riskScore)
-  const showUnit = config.unit && !config.format(value).includes(config.unit);
-
+function MiniStat({ icon, label, value, unit, status }) {
+  const meta = STATUS_META[status];
   return (
     <div className="flex flex-col gap-1.5">
-      {/* Label + ícone */}
-      <div className="flex items-center gap-1.5">
-        <span
-          className="material-symbols-outlined text-on-surface-variant"
-          style={{ fontSize: 14 }}
-        >
-          {config.icon}
-        </span>
-        <span className="text-label-md text-on-surface-variant uppercase tracking-widest">
-          {config.label}
-        </span>
+      <div className="flex items-center gap-1.5 text-on-surface-variant">
+        <Icon name={icon} size={14} />
+        <span className="text-label-md uppercase tracking-widest">{label}</span>
       </div>
-
-      {/* Valor atual */}
       <div className="flex items-end gap-1 leading-none">
-        <span className={`text-headline-md font-bold ${meta.textClass}`}>
-          {config.format(value)}
-        </span>
-        {showUnit && (
-          <span className="text-body-md text-on-surface-variant mb-0.5">
-            {config.unit}
-          </span>
-        )}
+        <span className={`text-headline-md font-bold tabular-nums ${meta.textClass}`}>{value}</span>
+        {unit && <span className="mb-0.5 text-body-md text-on-surface-variant">{unit}</span>}
       </div>
-
-      {/* Status clínico */}
       <div className="flex items-center gap-1.5">
-        <span
-          style={{
-            display: 'inline-block',
-            width: 6,
-            height: 6,
-            borderRadius: '50%',
-            backgroundColor: meta.color,
-            flexShrink: 0,
-          }}
-        />
+        <Dot color={meta.color} size={6} />
         <span className={`text-label-md ${meta.textClass}`}>{meta.label}</span>
       </div>
     </div>
   );
 }
 
-// ─── Card principal ───────────────────────────────────────────────────────────
+function Separator() {
+  return <span className="text-outline">·</span>;
+}
 
-export function PatientHeader({ patient, status, lastSuccessAt }) {
-  if (!patient) return <PatientHeaderSkeleton />;
-
-  const { nome, pacienteId, currentVitals } = patient;
-  const riskLevel   = currentVitals?.riskLevel;
-
-  // Borda esquerda colorida pelo nível de risco para identificação imediata
-  const borderColor = RISK_LEVEL_META[riskLevel]?.dot ?? '#3e4a40';
+/**
+ * @param {{
+ *   dashboard: import('../../domain/normalize').PatientDashboard,
+ *   status: import('../../hooks/usePatientDashboard').ConnectionStatus,
+ *   lastSuccessAt: number | null,
+ * }} props
+ */
+export function PatientHeader({ dashboard, status, lastSuccessAt }) {
+  const now = useNow();
+  const { nome, pacienteId, latest, latestRisk } = dashboard;
+  const riskMeta = latestRisk ? RISK_LEVELS[latestRisk.level] : null;
 
   return (
-    <div
-      className="bg-surface-container rounded-xl p-6 flex flex-col gap-5 border border-surface-variant"
-      style={{ borderLeft: `3px solid ${borderColor}` }}
+    <section
+      className="flex flex-col gap-5 rounded-xl border border-surface-variant bg-surface-container p-6"
+      style={{ borderLeft: `3px solid ${riskMeta?.color ?? COLORS.outlineVariant}` }}
     >
-      {/* Linha de identidade */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div>
-          <div className="flex flex-wrap items-center gap-3 mb-1">
-            <h2 className="text-headline-lg text-on-surface">
-              {nome ?? pacienteId}
-            </h2>
-
+          <div className="mb-1 flex flex-wrap items-center gap-3">
+            <h2 className="text-headline-lg text-on-surface">{nome ?? pacienteId}</h2>
             {status === 'online' && (
               <div className="flex items-center gap-1.5">
                 <StatusDot status="online" size={7} />
-                <span className="text-label-md text-on-surface-variant uppercase tracking-widest">
-                  Ao vivo
-                </span>
+                <span className="text-label-md uppercase tracking-widest text-on-surface-variant">Ao vivo</span>
               </div>
             )}
           </div>
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body-md text-on-surface-variant">
             <span>
-              ID:{' '}
-              <span className="text-on-surface font-medium">{pacienteId}</span>
+              ID: <span className="font-medium text-on-surface">{pacienteId}</span>
             </span>
-
-            {currentVitals?.timestamp && (
+            {latest && (
               <>
-                <span className="text-outline">·</span>
+                <Separator />
                 <span>
                   Última leitura:{' '}
-                  <span className="text-on-surface font-medium">
-                    {formatTimestamp(currentVitals.timestamp)}
-                  </span>
+                  <span className="font-medium tabular-nums text-on-surface">{formatTime(latest.t)}</span>
                 </span>
               </>
             )}
-
             {lastSuccessAt && (
               <>
-                <span className="text-outline">·</span>
-                <span>Sincronizado {formatRelativeTime(lastSuccessAt)}</span>
+                <Separator />
+                <span>Sincronizado {formatRelativeTime(lastSuccessAt, now)}</span>
               </>
             )}
-
-            {currentVitals?.source && (
+            {latest?.source && (
               <>
-                <span className="text-outline">·</span>
-                <span className="text-label-md bg-surface-container-high px-2 py-0.5 rounded-full uppercase tracking-wide">
-                  {currentVitals.source}
+                <Separator />
+                <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-label-md uppercase tracking-wide">
+                  {latest.source}
                 </span>
               </>
             )}
           </div>
         </div>
 
-        {riskLevel && <RiskBadge riskLevel={riskLevel} large />}
+        {latestRisk && <RiskBadge riskLevel={latestRisk.level} size="lg" />}
       </div>
 
-      {/* Divisor */}
       <div className="border-t border-surface-variant" />
 
-      {/* Grid com os 4 vitais atuais */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-        {VITALS_CONFIG.map((config) => (
-          <VitalMiniStat
-            key={config.key}
-            config={config}
-            value={currentVitals?.[config.key] ?? null}
-          />
-        ))}
+      <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+        {VITALS.map((vital) => {
+          const value = latest?.[vital.key] ?? null;
+          return (
+            <MiniStat
+              key={vital.key}
+              icon={vital.icon}
+              label={vital.label}
+              value={formatVital(vital, value)}
+              unit={value != null ? vital.unit : ''}
+              status={vital.getStatus(value)}
+            />
+          );
+        })}
+        <MiniStat
+          icon="crisis_alert"
+          label="Risco (IA)"
+          value={riskMeta?.label ?? '—'}
+          status={riskMeta?.status ?? 'unknown'}
+        />
       </div>
-    </div>
+    </section>
   );
 }

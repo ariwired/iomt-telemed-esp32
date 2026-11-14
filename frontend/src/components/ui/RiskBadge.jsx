@@ -1,31 +1,25 @@
-import React from 'react';
-import { RISK_LEVEL_META } from '../../constants/vitals';
+import { RISK_LEVELS } from '../../domain/vitals';
+import { Dot } from './Dot';
 
-export function RiskBadge({ riskLevel, large = false }) {
-  const meta = RISK_LEVEL_META[riskLevel];
+const SIZES = {
+  sm: { className: 'gap-1.5 px-2 py-0.5 text-label-md font-semibold', dot: 5 },
+  md: { className: 'gap-2 px-3 py-1.5 text-label-md font-bold tracking-widest uppercase', dot: 8 },
+  lg: { className: 'gap-2 px-4 py-2 text-body-md font-bold tracking-widest uppercase', dot: 10 },
+};
+
+/** Selo com o nível de risco. Não renderiza nada para nível desconhecido. */
+export function RiskBadge({ riskLevel, size = 'md', prefix = size !== 'sm' ? 'Risco ' : '' }) {
+  const meta = RISK_LEVELS[riskLevel];
   if (!meta) return null;
+  const { className, dot } = SIZES[size];
 
   return (
-    <div
-      className={[
-        'inline-flex items-center gap-2 rounded-full font-bold tracking-widest',
-        meta.bgClass,
-        meta.textClass,
-        large ? 'px-4 py-2 text-body-md' : 'px-3 py-1.5 text-label-md',
-      ].join(' ')}
+    <span
+      className={`inline-flex items-center whitespace-nowrap rounded-full ${className} ${meta.bgClass} ${meta.textClass}`}
     >
-      <span
-        style={{
-          display: 'inline-block',
-          width: large ? 10 : 8,
-          height: large ? 10 : 8,
-          borderRadius: '50%',
-          backgroundColor: meta.dot,
-          boxShadow: `0 0 8px ${meta.dot}88`,
-          flexShrink: 0,
-        }}
-      />
-      RISCO {meta.label}
-    </div>
+      <Dot color={meta.color} size={dot} glow={size !== 'sm'} />
+      {prefix}
+      {meta.label}
+    </span>
   );
 }

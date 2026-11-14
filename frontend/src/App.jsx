@@ -1,33 +1,38 @@
-import React, { useState } from 'react';
-import { SideNav }  from './components/layout/SideNav';
-import { TopBar }   from './components/layout/TopBar';
-import { DashboardPage } from './pages/DashboardPage';
-import { HistoryPage }   from './pages/HistoryPage';
+import { useState } from 'react';
+import { SideNav } from './components/layout/SideNav';
+import { PAGES } from './navigation';
+import { TopBar } from './components/layout/TopBar';
 import { usePatientDashboard } from './hooks/usePatientDashboard';
+import { DashboardPage } from './pages/DashboardPage';
+import { HistoryPage } from './pages/HistoryPage';
+
+const PAGE_COMPONENTS = {
+  monitoring: DashboardPage,
+  history: HistoryPage,
+};
 
 export default function App() {
-  const [patientId,   setPatientId]   = useState(null);
+  const [patientId, setPatientId] = useState(null);
   const [currentPage, setCurrentPage] = useState('monitoring');
 
-  const { data, error, status, lastSuccessAt, refetch } = usePatientDashboard(patientId);
-
-  const pageProps = { patientId, data, error, status, lastSuccessAt, refetch };
+  // Um único polling compartilhado pelas páginas: trocar de aba não refaz a consulta.
+  const query = usePatientDashboard(patientId);
+  const Page = PAGE_COMPONENTS[currentPage];
 
   return (
-    <div className="flex bg-background text-on-surface h-screen overflow-hidden font-sans">
+    <div className="flex h-dvh overflow-hidden bg-background font-sans text-on-surface">
       <SideNav activePage={currentPage} onNavigate={setCurrentPage} />
 
-      <div className="flex flex-col flex-1 md:ml-[280px] w-full h-full overflow-y-auto scrollbar-thin">
+      <div className="scrollbar-thin flex h-full w-full flex-1 flex-col overflow-y-auto md:ml-[280px]">
         <TopBar
-          status={status}
-          lastSuccessAt={lastSuccessAt}
-          onRefetch={refetch}
+          title={PAGES[currentPage].label}
+          status={query.status}
+          lastSuccessAt={query.lastSuccessAt}
+          onRefetch={query.refetch}
           patientId={patientId}
           onPatientSearch={setPatientId}
         />
-
-        {currentPage === 'monitoring' && <DashboardPage {...pageProps} />}
-        {currentPage === 'history'    && <HistoryPage   {...pageProps} />}
+        <Page patientId={patientId} query={query} />
       </div>
     </div>
   );
